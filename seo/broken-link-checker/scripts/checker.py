@@ -19,6 +19,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from collections import deque
 from html.parser import HTMLParser
 
+
 class LinkParser(HTMLParser):
     def __init__(self, base_url):
         super().__init__()
@@ -35,10 +36,11 @@ class LinkParser(HTMLParser):
                     if url.startswith('http'):
                         self.links.add(url)
 
+
 def check_url(url, timeout=10):
     """Checks a URL and returns (status_code, error_msg)."""
     headers = {'User-Agent': 'ToprankBrokenLinkChecker/1.0'}
-    
+
     # Try HEAD first for efficiency
     req = urllib.request.Request(url, method='HEAD', headers=headers)
     try:
@@ -62,10 +64,11 @@ def check_url(url, timeout=10):
     except Exception as e:
         return None, str(e)
 
+
 def crawl(start_url, max_pages=50):
     parsed_start = urllib.parse.urlparse(start_url)
     domain = parsed_start.netloc
-    
+
     # Robots.txt check
     rp = urllib.robotparser.RobotFileParser()
     try:
@@ -87,7 +90,7 @@ def crawl(start_url, max_pages=50):
         current_url = queue.popleft()
         if current_url in visited:
             continue
-        
+
         # Check robots.txt Disallow
         if rp and not rp.can_fetch("ToprankBrokenLinkChecker/1.0", current_url):
             print(f"Skipping (blocked by robots.txt): {current_url}", file=sys.stderr)
@@ -95,9 +98,9 @@ def crawl(start_url, max_pages=50):
 
         visited.add(current_url)
         pages_crawled += 1
-        
+
         print(f"[{pages_crawled}/{max_pages}] Checking: {current_url}", file=sys.stderr)
-        
+
         try:
             req = urllib.request.Request(current_url, headers={'User-Agent': 'ToprankBrokenLinkChecker/1.0'})
             with urllib.request.urlopen(req, timeout=10) as response:
@@ -105,22 +108,25 @@ def crawl(start_url, max_pages=50):
                 if status >= 400:
                     broken_links.append({"url": current_url, "status": status, "reason": "Page itself is broken"})
                     continue
-                
+
                 content_type = response.headers.get('Content-Type', '')
                 if 'text/html' not in content_type:
                     continue
-                
+
                 html = response.read().decode('utf-8', errors='ignore')
                 parser = LinkParser(current_url)
                 parser.feed(html)
-                
+
                 found_links = list(parser.links)
                 with ThreadPoolExecutor(max_workers=5) as executor:
                     future_to_url = {executor.submit(check_url, link): link for link in found_links}
                     for future in as_completed(future_to_url):
                         link = future_to_url[future]
-                        link_status, reason = future.result()
-                        
+                        try:
+                            link_status, reason = future.result()
+                        except Exception as e:
+                            link_status, reason = None, str(e)
+
                         if link_status is None or link_status >= 400:
                             broken_links.append({
                                 "source": current_url,
@@ -128,7 +134,7 @@ def crawl(start_url, max_pages=50):
                                 "status": link_status,
                                 "reason": reason
                             })
-                        
+
                         # Add internal links to queue
                         if urllib.parse.urlparse(link).netloc == domain and link not in visited:
                             queue.append(link)
@@ -139,28 +145,30 @@ def crawl(start_url, max_pages=50):
 
     return broken_links
 
+
 def main():
     parser = argparse.ArgumentParser(description="Broken Link Checker")
     parser.add_argument("--url", required=True, help="Starting URL")
     parser.add_argument("--max-pages", type=int, default=50, help="Maximum pages to crawl")
     parser.add_argument("--output", help="Output JSON file")
-    
+
     args = parser.parse_args()
-    
+
     broken = crawl(args.url, args.max_pages)
-    
+
     result = {
         "start_url": args.url,
         "max_pages": args.max_pages,
         "broken_links_count": len(broken),
         "broken_links": broken
     }
-    
+
     if args.output:
         with open(args.output, 'w') as f:
             json.dump(result, f, indent=2)
     else:
         print(json.dumps(result, indent=2))
+
 
 if __name__ == "__main__":
     main()
