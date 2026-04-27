@@ -178,6 +178,7 @@ Add the marketplace and enable the plugin in `~/.claude/settings.json`:
 | [`schema-markup-generator`](seo/schema-markup-generator/) | JSON-LD structured data for rich results. FAQ, HowTo, Article, Product, LocalBusiness. |
 | [`seo-page`](seo/seo-page/) | Single-page deep analysis. Focused audit of a specific URL for content quality, structure, and keyword optimization. |
 | [`broken-link-checker`](seo/broken-link-checker/) | Scans websites to find and report broken internal and external links (404s/5xx). |
+| [`geo-optimizer`](seo/geo-optimizer/) | Generative Engine Optimization (GEO) for AI search engines. Audits content with a 0–100 GEO Score, rewrites for AI citation, and produces per-engine strategy for ChatGPT, Claude, Perplexity, Gemini, and Google AI Overviews. |
 | [`setup-cms`](seo/setup-cms/) | Connect WordPress, Strapi, Contentful, or Ghost for automated SEO field audits. |
 
 ### Cross-Model
@@ -211,6 +212,8 @@ toprank/
 │   ├── meta-tags-optimizer/     <- title tags, meta descriptions, OG
 │   ├── schema-markup-generator/ <- JSON-LD structured data
 │   ├── seo-page/                <- single-page deep analysis
+│   ├── broken-link-checker/     <- broken link scanner
+│   ├── geo-optimizer/           <- GEO for AI search engines
 │   └── setup-cms/               <- CMS connector
 ├── gemini/                      <- cross-model review via Gemini CLI
 ├── toprank-upgrade-skill/       <- self-updater
