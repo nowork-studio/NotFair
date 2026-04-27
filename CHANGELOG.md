@@ -6,6 +6,13 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [0.14.0] — 2026-04-27
+
+### Added
+- **New Skill: `geo-optimizer`** — Generative Engine Optimization for AI search engines (ChatGPT, Claude, Perplexity, Gemini, Google AI Overviews). Three modes: **audit** (score content on the GEO Signal Stack with a 0–100 GEO Score across Evidence Density / Structure & Position / Authority Signals / AI Crawlability), **optimize** (rewrite content applying real-evidence patterns derived from the Princeton GEO paper, KDD 2024, and CMU AutoGEO, ICLR 2026), and **strategy** (30/60/90-day per-engine playbook). Distinct from the existing `content-writer` skill — content-writer optimizes for Google's blue-link rankings, geo-optimizer optimizes for AI citation. Includes a comprehensive `references/geo-techniques.md` covering PAWC front-loading, evidence density targets, per-engine playbooks (each engine has a different citation profile — ChatGPT cites Wikipedia ~48%, Perplexity weights freshness, Gemini leans Reddit, Claude weights primary sources), AI crawler robots.txt configuration, and measurement patterns aligned with `gego` and `llmopt` open-source trackers. **Hard rule: no fabricated stats, quotes, or citations** — ships an Evidence Hunt workflow that requires real, verifiable sources before any rewrite.
+
+---
+
 ## [0.13.2] — 2026-04-26
 
 ### Added
