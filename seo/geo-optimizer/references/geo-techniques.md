@@ -61,12 +61,14 @@ Best combo: **Fluency + Statistics** (≥+35%, beats any single technique).
 
 ### 3. Generative engines don't use PageRank
 
-This is the democratization finding: rank-5 sites gained +115% visibility
-with citation addition while rank-1 sites *lost* 30%. The implication —
+This is the democratization finding from the Princeton GEO paper
+(arXiv:2311.09735, Table 2): rank-5 sites gained ~+115% visibility with
+the Cite Sources method while rank-1 sites *lost* ~30%, averaged across
+their multi-domain experiment. Numbers are representative of the paper's
+test setup, not a universal guarantee. The implication still holds:
 weaker-authority sites can punch up dramatically by adding evidence
-signals, because the LLM doesn't care that your domain has 30 backlinks
-vs. the New York Times' 30 million. **It cares whether your sentence is
-the most quotable one.**
+signals, because the LLM doesn't apply PageRank-style domain weighting
+when citing. **It cares whether your sentence is the most quotable one.**
 
 ### 4. Engines diverge
 
@@ -120,7 +122,7 @@ Four pillars, weighted as in the audit scoring:
 |--------|--------|
 | Author byline | Real name, role, ≥30-word bio |
 | `author.sameAs` JSON-LD | Wikipedia, LinkedIn, ORCID, Google Scholar |
-| Last updated within 90 days | Recency (3× citation lift per Princeton + amplifying-ai data) |
+| Last updated within 60 days | Recency (3× citation lift per Princeton + amplifying-ai data); 60–90 days is the boundary, target 60 |
 | Methodology disclosed | Sample sizes, criteria, dates |
 | Limitations acknowledged | Counter-LLM-hallucination signal |
 | First-party experience markers | "We tested", "Our analysis of N…" — not vague "experts say" |
@@ -182,37 +184,46 @@ every page needs every pattern.
 > seeking ways to optimize their online presence. This article will explore
 > the various strategies and considerations involved in [topic]."
 
-**After:**
-> "[Topic]'s ROI averages 3.2× across SaaS B2B (Forrester, 2024) when
-> implemented with [specific approach]. Three steps drive that lift:
+**After (template — replace bracketed values with real, verified data
+before publishing):**
+> "[Topic]'s ROI averages [REAL_NUMBER]× ([REAL_SOURCE_WITH_URL], [YEAR])
+> when implemented with [specific approach]. Three steps drive that lift:
 > [step 1], [step 2], [step 3]. Below: how to implement each in 2 weeks."
 
-The first sentence has: a specific number, a unit (×), a real source, a
-year, and a concrete preview of what's coming. PAWC will weigh this
-sentence ~5× any conclusion paragraph.
+The first sentence carries: a specific number, a unit, a real-source
+citation, a year, and a concrete preview. PAWC will weigh this sentence
+~5× any conclusion paragraph. **Do not ship the template values** — every
+bracketed value must be replaced with a real, verifiable fact before this
+content goes live. Run the Evidence Hunt section below to source them.
 
 ### Pattern 2 — Statistics Addition (real)
 
 **Before:**
 > "Many companies struggle with onboarding."
 
-**After:**
-> "63% of SaaS companies report onboarding as their top churn driver
-> (ChartMogul Customer Retention Report 2024, n=2,847)."
+**After (template):**
+> "[REAL_PERCENT]% of [defined population] report [specific finding]
+> ([REAL_SOURCE_NAME_WITH_URL], [year], n=[real sample size])."
 
 Rule: every claim that can be quantified, must be. Hunt for the real stat
 before falling back to vague language. If the stat doesn't exist publicly,
-reframe the claim.
+follow the "What to do when the stat doesn't exist" section below — never
+keep the claim as a vague unsourced statement.
 
 ### Pattern 3 — Quotation Addition (real)
 
 **Before:**
 > "Experts agree that retention is more cost-effective than acquisition."
 
-**After:**
-> "'A 5% increase in customer retention can increase profits by 25–95%,'
-> wrote Frederick Reichheld in *Loyalty Effect* (Harvard Business School
-> Press, 1996), the foundational study on retention economics."
+**After (template):**
+> "'[Verbatim quote from a real, named person],' [wrote/said]
+> [Real Name] in *[Real Publication Title]* ([Publisher], [Year]),
+> [one-line context establishing why this person is authoritative]."
+
+A real working example for the retention claim above: Frederick Reichheld
+& Earl Sasser's "Zero Defections: Quality Comes to Services" (Harvard
+Business Review, Sep–Oct 1990) is the canonical retention-economics
+citation. Verify the quote and URL before publishing.
 
 Rule: cite a real person at a real org with a real publication. If you
 can't find one for the claim, the claim probably isn't load-bearing.
@@ -222,14 +233,16 @@ can't find one for the claim, the claim probably isn't load-bearing.
 **Before:**
 > "Search behavior has shifted toward AI assistants."
 
-**After:**
-> "AI assistants now handle 19% of complex search queries (Pew Research,
-> April 2025) versus 4% in 2023, with growth concentrated in the 18–34
-> demographic ([source URL])."
+**After (template):**
+> "[Specific stat]% of [defined activity] now [specific behavior]
+> ([Real Research Firm], [Month Year], [URL]) versus [historical stat]
+> in [comparison year], with [observed pattern]."
 
 Rule: ≥1 citation per 500 words, ≥3 source types per article. Source types
 include: peer-reviewed papers, government data, industry research firms,
-named publications, primary first-party data.
+named publications, primary first-party data. Every citation must include
+a URL the reader can click — citations without verifiable URLs do not
+count toward the density target and trigger the fabrication veto.
 
 ### Pattern 5 — Fluency Optimization
 
@@ -304,17 +317,23 @@ Before any rewrite, build a source list. Tools in priority order:
 
 ### What to do when the stat doesn't exist
 
-If you genuinely can't find a real source for a claim:
+If you genuinely can't find a real source for a claim, in order of preference:
 
-1. **Reframe to a directional statement** — "growing rapidly" instead of
-   "growing 47% YoY"
-2. **Anchor to a related, verifiable stat** — "the broader [parent category]
-   grew 12% in 2024 (source)"
-3. **Run an internal analysis** — if the user has data, use it
-4. **Drop the claim** — if it's not load-bearing, cut it
+1. **Anchor to a related, verifiable stat** — "the broader [parent category]
+   grew 12% in 2024 (Source, URL)" with a real source for the parent number.
+   This is acceptable because the citation is real and the relationship is
+   stated honestly.
+2. **Run an internal analysis** — if the user has data, use it. First-party
+   data is the strongest GEO signal anyway.
+3. **Drop the claim** — if it's not load-bearing, cut it.
+
+**Do not** keep the claim as a vague directional statement ("growing
+rapidly", "increasingly common", "many companies"). That violates the
+vague-entity anti-pattern below — vague unsourced statements are still
+fabrication-adjacent and dilute the page's evidence density.
 
 Never invent. Not "according to a 2024 study", not "experts estimate", not
-"surveys show". Real source or no claim.
+"surveys show". Real source with URL, or no claim.
 
 ---
 
@@ -508,11 +527,17 @@ GEO without measurement is a vibe. Set up at minimum:
 
 ### Citation tracking
 
-- **gego** (open source, Go) — schedules prompts across OpenAI, Anthropic,
-  Gemini, Perplexity, Ollama; regex-matches brand mentions; Perplexity
-  Sonar URL capture is unique. Free, self-host.
-- **llmopt** (open source, Go + React) — richer multi-pillar scoring,
-  YouTube transcript signals, MCP integration. Free, self-host.
+- **gego** — open source (Go), self-host. Schedules prompts across
+  OpenAI, Anthropic, Gemini, Perplexity, Ollama; regex-matches brand
+  mentions; Perplexity Sonar URL capture is unique. Repo:
+  https://github.com/AI2HU/gego — clone, follow README to set API keys
+  and run the cron scheduler.
+- **llmopt** — open source (Go + React), self-host. Richer multi-pillar
+  scoring (LLM knowledge testing, AEO content scoring, video authority
+  via YouTube transcripts, Reddit authority, search visibility), MCP
+  integration for Claude Code/Desktop. Repo:
+  https://github.com/jonradoff/llmopt — clone, follow README to
+  configure API keys and start the dashboard.
 - **Manual baseline** — every 2 weeks, run 5 brand queries + 5 category
   queries against ChatGPT, Claude, Perplexity, Gemini. Log: cited (Y/N),
   position in answer, sentiment.
@@ -549,7 +574,7 @@ GEO without measurement is a vibe. Set up at minimum:
 - Add real stats with units, sources, dates
 - Quote real named experts from named publications
 - Cite ≥1 external source per 500 words from ≥3 source types
-- Update content quarterly minimum, monthly for fast-moving topics
+- Update content every 60 days for competitive queries, 90 days minimum for stable topics
 - Allow all major AI crawlers in robots.txt + CDN
 - Add Article + FAQPage + HowTo schema as appropriate
 - Build Wikipedia / Wikidata / Reddit presence

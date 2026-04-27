@@ -7,10 +7,12 @@ description: >
   Audits existing content, rewrites for AI citation, and produces per-engine
   strategy. Use when asked to "optimize for AI search", "rank in ChatGPT",
   "GEO audit", "improve AI citations", "rank in Perplexity", "AI Overview
-  optimization", "LLM SEO", "answer engine optimization", "AEO", "get cited
-  by AI", "GEO", "generative engine optimization", or "make my content show
-  up in AI answers". Distinct from regular SEO — this targets generative
-  engines, not traditional Google rankings.
+  optimization", "AI Overview ranking", "LLM SEO", "answer engine
+  optimization", "AEO", "get cited by AI", "GEO", "generative engine
+  optimization", "show up in ChatGPT", "appear in AI answers", "be cited
+  by Perplexity", "SGE optimization", "Search Generative Experience", or
+  "make my content show up in AI answers". Distinct from regular SEO —
+  this targets generative engines, not traditional Google rankings.
 ---
 
 # GEO Optimizer
@@ -119,6 +121,10 @@ Apply **veto checks** (auto-cap score at 60):
 - Title-content intent mismatch (clickbait)
 - Missing author / no first-party identity
 - Blocked AI crawlers (GPTBot, ClaudeBot, PerplexityBot, Google-Extended)
+- YMYL content (health, finance, legal, safety) without appropriate
+  disclaimers or qualified-author byline
+- Fabricated citations, statistics, or expert names detected — this is
+  a hard fail, not a cap. Refuse to produce the audit and explain.
 
 Output format:
 
@@ -290,8 +296,9 @@ After delivering, suggest the natural next step:
 - **Optimize completed** → "Want a strategy for the rest of the site? Run me with `strategy`."
 - **Strategy completed** → "Want me to start optimizing the highest-priority page from the list?"
 
-If `seo-analysis` data was used as input, route the optimized content
-back into the user's CMS via `setup-cms` if it's configured.
+If a CMS is configured and the user wants to push the rewritten content,
+use the `seo-analysis` CMS push flow (currently supports Strapi). For
+other CMSes, the user manually applies the markdown output.
 
 ---
 
