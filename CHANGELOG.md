@@ -6,6 +6,13 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [0.15.1] — 2026-04-28
+
+### Changed
+- **`google-ads/shared/preamble.md` — Step 4 zero-account guidance.** Updated the onboarding instructions for users whose Google identity has no accessible Google Ads customer (`listConnectedAccounts` returns an empty list / `noAccount: true`). The previous copy directed them to a static "connect at notfair.co" link; the new flow is a self-contained recovery loop driven from inside Claude — Claude tells the user to create a Google Ads account at https://ads.google.com (Smart Mode is the fastest path; payment method optional), then calls the new `refreshAccounts` MCP tool to detect the account without re-authentication. Includes propagation guidance for the 1-2 minute delay between Google account creation and the customer record becoming queryable. Pairs with the NotFair server-side change that ships an MCP bearer token even for no-account sessions, so the Claude Desktop OAuth handshake completes instead of dead-ending in a hung browser tab.
+
+---
+
 ## [0.15.0] — 2026-04-28
 
 ### Changed

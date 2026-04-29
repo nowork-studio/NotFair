@@ -126,7 +126,9 @@ Use the `listConnectedAccounts` result from Step 3 (do not call it again):
 
 1. **One account** → save automatically to the highest-priority config file that already exists (project > claude-project > global; if none exist yet, save to `~/.notfair/config.json`), tell the user which was selected
 2. **Multiple accounts** → show numbered list, ask user to pick, save choice to the same location
-3. **Zero accounts** → direct to [notfair.co](https://notfair.co) to connect one
+3. **Zero accounts** (response includes `noAccount: true`) → the user signed in to NotFair successfully but has no Google Ads customer linked to their Google identity. Tell them:
+   > "Your Google account isn't linked to a Google Ads customer yet. Create one at https://ads.google.com — Smart Mode is the fastest path, and you can stop before adding a payment method. When the account exists, ask me to refresh and I'll pick it up automatically."
+   When they confirm the account is created, call `refreshAccounts` (no args). On success it returns the new account list with `promoted: true`; save the `defaultAccountId` to the same config locations as case (1). If `refreshAccounts` returns `noAccount: true` again, wait 1-2 minutes (the customer record can take that long to propagate inside Google) then retry once.
 
 ### Switching accounts
 
