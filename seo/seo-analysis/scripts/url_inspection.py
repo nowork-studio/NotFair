@@ -10,14 +10,14 @@ Required OAuth scope: https://www.googleapis.com/auth/webmasters
 (Not just webmasters.readonly — URL Inspection requires the broader scope.)
 
 Usage:
-  python3 url_inspection.py --site "sc-domain:example.com" \\
+  python3 url_inspection.py --site "sc-domain:example.com" \
     --urls "https://example.com/,https://example.com/pricing"
 
-  python3 url_inspection.py --site "https://example.com/" \\
+  python3 url_inspection.py --site "https://example.com/" \
     --urls-file /tmp/urls.txt
 
-  python3 url_inspection.py --site "sc-domain:example.com" \\
-    --urls "https://example.com/,https://example.com/blog" \\
+  python3 url_inspection.py --site "sc-domain:example.com" \
+    --urls "https://example.com/,https://example.com/blog" \
     --output /tmp/inspection_results.json
 """
 
@@ -134,16 +134,24 @@ def normalize_site_url_for_inspection(site_url, url):
         return f"{base}{url}"
 
 
+def _as_dict(value):
+    return value if isinstance(value, dict) else {}
+
+
+def _as_list(value):
+    return value if isinstance(value, list) else []
+
+
 def parse_inspection_result(raw, url):
     """Extract the fields we care about from the API response."""
-    ir = raw.get("inspectionResult", {})
+    ir = _as_dict(_as_dict(raw).get("inspectionResult"))
 
     # Index status
-    index_result = ir.get("indexStatusResult", {})
+    index_result = _as_dict(ir.get("indexStatusResult"))
     indexing_state = index_result.get("coverageState", "UNKNOWN")
     verdict = index_result.get("verdict", "UNKNOWN")
     last_crawl = index_result.get("lastCrawlTime", None)
-    referring_sitemaps = index_result.get("referringSitemaps", [])
+    referring_sitemaps = _as_list(index_result.get("referringSitemaps"))
     crawled_as = index_result.get("crawledAs", None)
     google_canonical = index_result.get("googleCanonical", None)
     user_canonical = index_result.get("userDeclaredCanonical", None)
@@ -152,22 +160,31 @@ def parse_inspection_result(raw, url):
     indexing_state_value = index_result.get("indexingState", None)
 
     # Mobile usability
-    mobile_result = ir.get("mobileUsabilityResult", {})
+    mobile_result = _as_dict(ir.get("mobileUsabilityResult"))
     mobile_verdict = mobile_result.get("verdict", "VERDICT_UNSPECIFIED")
     mobile_issues = [
         issue.get("issueType", "UNKNOWN")
-        for issue in mobile_result.get("issues", [])
+        for issue in _as_list(mobile_result.get("issues"))
+        if isinstance(issue, dict)
     ]
 
     # Rich results
-    rich_result = ir.get("richResultsResult", {})
+    rich_result = _as_dict(ir.get("richResultsResult"))
     rich_verdict = rich_result.get("verdict", "VERDICT_UNSPECIFIED")
     rich_items = []
-    for item in rich_result.get("detectedItems", []):
-        for ri in item.get("items", []):
+    for item in _as_list(rich_result.get("detectedItems")):
+        if not isinstance(item, dict):
+            continue
+        for ri in _as_list(item.get("items")):
+            if not isinstance(ri, dict):
+                continue
             item_entry = {
                 "name": ri.get("name", ""),
-                "issues": [i.get("issueMessage", "") for i in ri.get("issues", [])]
+                "issues": [
+                    issue.get("issueMessage", "")
+                    for issue in _as_list(ri.get("issues"))
+                    if isinstance(issue, dict)
+                ]
             }
             rich_items.append(item_entry)
 
@@ -316,8 +333,8 @@ def main():
             else:
                 parsed = parse_inspection_result(raw, absolute_url)
                 results.append(parsed)
-                verdict = parsed["index_status"]["verdict"]
-                mobile = parsed["mobile_usability"]["verdict"]
+                verdict = parsed.get("index_status", {}).get("verdict", "UNKNOWN")
+                mobile = parsed.get("mobile_usability", {}).get("verdict", "VERDICT_UNSPECIFIED")
                 print(f"  ✓ {absolute_url} — Index: {verdict} | Mobile: {mobile}",
                       file=sys.stderr)
 
