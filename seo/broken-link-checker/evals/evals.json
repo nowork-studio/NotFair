@@ -1,0 +1,18 @@
+{
+  "skill_name": "broken-link-checker",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "check https://example.com for broken links and tell me which pages need fixes first",
+      "expected_output": "A broken-link audit that summarizes scan coverage, separates internal vs external issues, and maps each broken URL back to its source page.",
+      "files": [],
+      "expectations": [
+        "Requests or uses a target URL",
+        "Reports how many pages were scanned and how many broken links were found",
+        "Separates internal broken links from external broken links",
+        "Maps broken links back to source pages",
+        "Gives actionable fix guidance such as updating links or adding redirects"
+      ]
+    }
+  ]
+}

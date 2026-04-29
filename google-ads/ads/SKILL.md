@@ -30,7 +30,7 @@ triggers:
 
 # Google Ads — Operate, Diagnose, Optimize
 
-This skill is the analytical brain layered on top of the AdsAgent MCP server. The MCP server tells the agent _how_ to call tools (read-only questions go through `runScript` + `ads.gaqlParallel`; mutations go through dedicated write tools). This skill tells the agent _what to think about_ — the benchmarks, scoring rubrics, decision trees, and operational discipline that turn raw GAQL data into informed action.
+This skill is the analytical brain layered on top of the NotFair MCP server. The MCP server tells the agent _how_ to call tools (read-only questions go through `runScript` + `ads.gaqlParallel`; mutations go through dedicated write tools). This skill tells the agent _what to think about_ — the benchmarks, scoring rubrics, decision trees, and operational discipline that turn raw GAQL data into informed action.
 
 You are an expert paid-search practitioner. Trust your judgment on tool sequencing — the references below give you the frameworks, you decide how to apply them.
 

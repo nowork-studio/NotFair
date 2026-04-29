@@ -19,7 +19,7 @@ This code ships to real users. Sycophancy and rubber-stamping cost us credibilit
 - Home of the `toprank` plugin — the public artifact customers install.
 - Contains skills under `google-ads/`, `seo/`, `gemini/`, and `toprank-upgrade-skill/`.
 - Registered via `.claude-plugin/plugin.json` (skills list) and `.claude-plugin/marketplace.json` (plugin metadata).
-- Paired with the NotFair MCP server (`https://notfair.co/api/mcp`, OAuth, formerly hosted at adsagent.org) for Google Ads write operations, and with Google Search Console for SEO reads.
+- Paired with the NotFair MCP server (`https://notfair.co/api/mcp`, OAuth) for Google Ads write operations, and with Google Search Console for SEO reads.
 
 ## Critical: this ships to users
 
@@ -45,4 +45,4 @@ Semantic-ish: bump patch for skill additions / fixes, minor for new categories o
 ## Related repos
 
 - `adsagent-plugin/` (sibling dir, separate public repo) — a smaller Google-Ads-only plugin. Some skills are mirrored there; don't confuse it with this one.
-- AdsAgent MCP server — private, powers the Google Ads tool calls the skills depend on.
+- NotFair MCP server — private, powers the Google Ads tool calls the skills depend on.

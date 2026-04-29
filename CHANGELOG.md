@@ -6,6 +6,13 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [0.15.2] — 2026-04-29
+
+### Changed
+- **Branding cleanup across the public plugin surface.** Updated Toprank's README, marketplace metadata, plugin metadata, eval prompts, and Google Ads skill copy to present the product as NotFair / `notfair.co` instead of the old AdsAgent branding where the references were still user-facing. Kept intentional legacy migration notes and technical compatibility references (`.adsagent`, `mcp__adsagent__*`, `adsagent://playbooks/...`) intact where they still describe real compatibility behavior.
+
+---
+
 ## [0.15.1] — 2026-04-28
 
 ### Changed

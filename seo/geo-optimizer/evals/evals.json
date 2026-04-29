@@ -1,0 +1,18 @@
+{
+  "skill_name": "geo-optimizer",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "do a GEO audit of https://example.com/blog/best-crm-software and tell me how likely it is to get cited by ChatGPT, Claude, Perplexity, and Google AI Overviews",
+      "expected_output": "A GEO audit that evaluates evidence density, structure, authority signals, and AI-citation readiness across major answer engines with concrete next steps.",
+      "files": [],
+      "expectations": [
+        "Recognizes this as a GEO audit request",
+        "Assesses AI-search readiness rather than traditional SEO alone",
+        "Discusses evidence density, structure, or authority signals",
+        "Differentiates considerations across multiple AI engines",
+        "Provides concrete recommendations without fabricating evidence"
+      ]
+    }
+  ]
+}

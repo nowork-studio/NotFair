@@ -4,18 +4,18 @@
     "name": "nowork-studio"
   },
   "metadata": {
-    "description": "The official Google Ads + SEO + GEO plugin from AdsAgent. SEO, GEO, and Google Ads skills for Claude Code.",
-    "version": "0.15.1"
+    "description": "The official Google Ads + SEO + GEO plugin from NotFair. SEO, GEO, and Google Ads skills for Claude Code.",
+    "version": "0.15.2"
   },
   "plugins": [
     {
       "name": "toprank",
       "source": "./",
-      "description": "The official Google Ads + SEO + GEO plugin from AdsAgent. SEO analysis, Google Ads management, keyword research, content optimization, schema markup, meta tags optimization, broken link checker, single-page deep audit, and Generative Engine Optimization for AI search.",
-      "version": "0.15.1",
+      "description": "The official Google Ads + SEO + GEO plugin from NotFair. SEO analysis, Google Ads management, keyword research, content optimization, schema markup, meta tags optimization, broken link checker, single-page deep audit, and Generative Engine Optimization for AI search.",
+      "version": "0.15.2",
       "author": {
-        "name": "AdsAgent",
-        "url": "https://adsagent.org"
+        "name": "NotFair",
+        "url": "https://notfair.co"
       },
       "category": "productivity"
     }

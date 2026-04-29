@@ -48,13 +48,18 @@ SKILL_ENTRIES=(
   "ads:google-ads/ads"
   "ads-audit:google-ads/ads-audit"
   "ads-copy:google-ads/ads-copy"
+  "ads-landing:google-ads/ads-landing"
   "seo-analysis:seo/seo-analysis"
+  "content-writer:seo/content-writer"
   "keyword-research:seo/keyword-research"
   "meta-tags-optimizer:seo/meta-tags-optimizer"
   "schema-markup-generator:seo/schema-markup-generator"
-  "content-writer:seo/content-writer"
   "setup-cms:seo/setup-cms"
+  "seo-page:seo/seo-page"
+  "broken-link-checker:seo/broken-link-checker"
+  "geo-optimizer:seo/geo-optimizer"
   "toprank-upgrade:toprank-upgrade-skill"
+  "gemini:gemini"
 )
 
 skill_name() { echo "${1%%:*}"; }
@@ -111,29 +116,30 @@ for entry in "${SKILL_ENTRIES[@]}"; do
 done
 
 # Guard: actual SKILL.md count must match
-actual_skill_count=$(find "$REPO_ROOT/google-ads" "$REPO_ROOT/seo" "$REPO_ROOT/toprank-upgrade-skill" -name "SKILL.md" | wc -l | tr -d ' ')
+actual_skill_count=$(find "$REPO_ROOT/google-ads" "$REPO_ROOT/seo" "$REPO_ROOT/toprank-upgrade-skill" "$REPO_ROOT/gemini" -name "SKILL.md" | wc -l | tr -d ' ')
 if [ "$actual_skill_count" -ne "${#SKILL_ENTRIES[@]}" ]; then
   fail "Expected ${#SKILL_ENTRIES[@]} SKILL.md files but found $actual_skill_count"
 else
   pass "skill count matches ($actual_skill_count)"
 fi
 
-# ─── Test 3: No old structure remains ────────────────────────
+# ─── Test 3: Legacy structure removed, helper bin retained ─────────
 
 echo ""
-echo "=== 3. Old structure removed ==="
+echo "=== 3. Legacy structure + helpers ==="
 
 [ ! -f "$REPO_ROOT/setup" ] \
   && pass "setup script removed" \
   || fail "setup script still exists (should be deleted)"
 
-[ ! -d "$REPO_ROOT/bin" ] \
-  && pass "bin/ directory removed" \
-  || fail "bin/ directory still exists"
+assert_dir "$REPO_ROOT/bin" "bin/ helper directory exists"
+assert_file "$REPO_ROOT/bin/toprank-config" "bin/toprank-config exists"
+assert_file "$REPO_ROOT/bin/toprank-update-check" "bin/toprank-update-check exists"
+assert_file "$REPO_ROOT/bin/toprank-change-watch" "bin/toprank-change-watch exists"
 
 [ ! -d "$REPO_ROOT/skills" ] \
   && pass "skills/ flat directory removed" \
-  || fail "skills/ directory still exists (skills should be in google-ads/, seo/, toprank-upgrade-skill/)"
+  || fail "skills/ directory still exists (skills should be in google-ads/, seo/, toprank-upgrade-skill/, gemini/)"
 
 [ ! -d "$REPO_ROOT/.agents" ] \
   && pass ".agents/ directory removed" \

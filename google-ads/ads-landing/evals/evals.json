@@ -1,0 +1,18 @@
+{
+  "skill_name": "ads-landing",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "audit this landing page for my Google Ads traffic: https://example.com/dog-training. CTR is solid but conversions are weak — tell me what's hurting the page and what to fix first.",
+      "expected_output": "A landing-page diagnostic covering message match, speed/mobile UX, trust signals, CTA/form friction, and the single highest-impact fix.",
+      "files": [],
+      "expectations": [
+        "Scores or diagnoses the page across the landing-page rubric dimensions",
+        "Checks message match between ad intent and page copy",
+        "Calls out page speed or mobile UX as part of the analysis",
+        "Identifies trust-signal or CTA/form friction issues",
+        "Prioritizes the top fix instead of giving an unranked list"
+      ]
+    }
+  ]
+}
