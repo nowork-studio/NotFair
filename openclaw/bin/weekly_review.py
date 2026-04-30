@@ -5,9 +5,11 @@ from __future__ import annotations
 
 import argparse
 import json
+import math
 import subprocess
 import sys
 import tempfile
+from urllib.parse import parse_qsl, urlencode, urlparse, urlunparse
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
@@ -67,7 +69,107 @@ def learned_multiplier(learned: dict[str, Any], action_type: str, primary_metric
     return max(0.7, min(1.5, round(raw, 3)))
 
 
-def make_issue(title: str, severity: str, confidence: float, evidence: list[str], action_type: str, target: str | None = None, base_priority: float = 0.5) -> dict[str, Any]:
+TRACKING_PARAM_NAMES = {
+    "fbclid",
+    "gclid",
+    "gbraid",
+    "wbraid",
+    "mc_cid",
+    "mc_eid",
+    "msclkid",
+}
+TRACKING_PARAM_PREFIXES = ("utm_",)
+
+
+def clamp(value: float, low: float, high: float) -> float:
+    return max(low, min(high, value))
+
+
+def expected_ctr_for_position(position: float | None) -> float:
+    """Return a conservative expected CTR percentage for a rough SERP position."""
+    if position is None or position <= 0:
+        return 1.0
+    if position <= 1.5:
+        return 18.0
+    if position <= 3:
+        return 10.0
+    if position <= 5:
+        return 6.0
+    if position <= 10:
+        return 3.0
+    if position <= 20:
+        return 1.5
+    return 0.5
+
+
+def sample_confidence(clicks: float = 0, impressions: float = 0) -> float:
+    """Soft confidence curve: larger samples earn more trust without a hard cutoff."""
+    click_component = 1 - math.exp(-max(clicks, 0) / 35)
+    impression_component = 1 - math.exp(-max(impressions, 0) / 1200)
+    return round(clamp(0.25 + (click_component * 0.45) + (impression_component * 0.3), 0.25, 1.0), 3)
+
+
+def url_context(url: str | None) -> dict[str, Any]:
+    if not url:
+        return {
+            "raw_target": None,
+            "canonical_target": None,
+            "url_quality_score": 0.8,
+            "has_tracking_params": False,
+            "operator_judgment_notes": [],
+        }
+
+    parsed = urlparse(url)
+    query_pairs = parse_qsl(parsed.query, keep_blank_values=True)
+    tracking_keys = [key for key, _ in query_pairs if key in TRACKING_PARAM_NAMES or key.startswith(TRACKING_PARAM_PREFIXES)]
+    remaining_pairs = [(key, value) for key, value in query_pairs if key not in TRACKING_PARAM_NAMES and not key.startswith(TRACKING_PARAM_PREFIXES)]
+    canonical_path = parsed.path or "/"
+    canonical_query = urlencode(remaining_pairs, doseq=True)
+    canonical = urlunparse((parsed.scheme, parsed.netloc, canonical_path, "", canonical_query, ""))
+
+    notes = []
+    if tracking_keys:
+        notes.append(f"tracking URL variant ({', '.join(sorted(set(tracking_keys)))})")
+    if query_pairs and not remaining_pairs:
+        notes.append("canonical target removes query parameters")
+
+    if tracking_keys and not remaining_pairs:
+        url_quality = 0.45
+    elif tracking_keys:
+        url_quality = 0.65
+    elif query_pairs:
+        url_quality = 0.8
+    else:
+        url_quality = 1.0
+
+    return {
+        "raw_target": url,
+        "canonical_target": canonical,
+        "url_quality_score": url_quality,
+        "has_tracking_params": bool(tracking_keys),
+        "operator_judgment_notes": notes,
+    }
+
+
+def severity_from_score(score: float) -> str:
+    if score >= 1.4:
+        return "critical"
+    if score >= 0.65:
+        return "warning"
+    return "info"
+
+
+def make_issue(
+    title: str,
+    severity: str,
+    confidence: float,
+    evidence: list[str],
+    action_type: str,
+    target: str | None = None,
+    base_priority: float = 0.5,
+    **extra: Any,
+) -> dict[str, Any]:
+    context = url_context(target)
     issue = {
         "title": title,
         "severity": severity,
@@ -75,10 +177,233 @@ def make_issue(title: str, severity: str, confidence: float, evidence: list[str]
         "evidence": evidence,
         "recommended_action_type": action_type,
         "base_priority": round(base_priority, 3),
+        "operator_judgment_notes": extra.pop("operator_judgment_notes", []) + context["operator_judgment_notes"],
+        "score_components": extra.pop("score_components", {}),
+        "raw_target": context["raw_target"],
+        "canonical_target": context["canonical_target"],
     }
     if target:
-        issue["target"] = target
+        issue["target"] = context["canonical_target"] or target
+    issue.update(extra)
     return issue
+
+
+
+def is_branded_query(query: str | None, brand_terms: list[str] | None) -> bool:
+    if not query or not brand_terms:
+        return False
+    q = query.lower()
+    return any(term and term.lower() in q for term in brand_terms)
+
+
+def goal_alignment_for_query(query: str | None, brand_terms: list[str] | None) -> tuple[float, list[str]]:
+    if is_branded_query(query, brand_terms):
+        return 0.35, ["branded/navigational query; lower priority for non-brand growth"]
+    return 1.0, []
+
+
+def decline_issue(page: dict[str, Any]) -> dict[str, Any]:
+    raw_target = page.get("page")
+    context = url_context(raw_target)
+    clicks_now = float(page.get("clicks_now") or 0)
+    clicks_prev = float(page.get("clicks_prev") or 0)
+    lost_clicks = max(clicks_prev - clicks_now, 0.0)
+    change_pct = float(page.get("change_pct") or 0)
+    confidence = sample_confidence(clicks=clicks_prev + clicks_now)
+    impact_score = clamp(lost_clicks / 50, 0.05, 2.0)
+    actionability_score = 0.75
+    action_type = "page_improvement"
+    title_target = raw_target
+    notes = []
+    if context["has_tracking_params"]:
+        action_type = "canonical_or_tracking_investigation"
+        actionability_score = 0.45
+        notes.append("treat as attribution/canonical investigation before editing page content")
+        title_target = context["canonical_target"] or raw_target
+    if lost_clicks < 25:
+        notes.append("low absolute click loss; percentage drop may overstate impact")
+
+    url_quality = float(context["url_quality_score"])
+    score = impact_score * confidence * actionability_score * url_quality
+    return make_issue(
+        f"Traffic dropped on {title_target}",
+        severity_from_score(score),
+        confidence,
+        [
+            f"Clicks changed {change_pct}% vs prior period.",
+            f"Current clicks: {clicks_now:g} | previous clicks: {clicks_prev:g} | lost clicks: {lost_clicks:g}",
+        ],
+        action_type,
+        target=raw_target,
+        base_priority=impact_score,
+        expected_click_delta=round(-lost_clicks, 1),
+        priority_score=round(score, 3),
+        score_components={
+            "expected_impact": round(impact_score, 3),
+            "confidence_score": confidence,
+            "goal_alignment_score": 1.0,
+            "actionability_score": actionability_score,
+            "url_quality_score": url_quality,
+        },
+        operator_judgment_notes=notes,
+    )
+
+
+def ctr_gap_issue(gap: dict[str, Any], brand_terms: list[str] | None = None) -> dict[str, Any]:
+    raw_target = gap.get("page")
+    clicks = float(gap.get("clicks") or 0)
+    impressions = float(gap.get("impressions") or 0)
+    ctr = float(gap.get("ctr") or 0)
+    position = float(gap.get("position") or 0)
+    expected_ctr = expected_ctr_for_position(position)
+    incremental_clicks = max(impressions * ((expected_ctr - ctr) / 100), 0.0)
+    impact_score = clamp(incremental_clicks / 50, 0.05, 2.0)
+    confidence = sample_confidence(clicks=clicks, impressions=impressions)
+    actionability_score = 0.95
+    url_quality = float(url_context(raw_target)["url_quality_score"])
+    query = gap.get("query")
+    goal_alignment_score, goal_notes = goal_alignment_for_query(query, brand_terms)
+    score = impact_score * confidence * goal_alignment_score * actionability_score * url_quality
+    evidence = [
+        f"{impressions:g} impressions with CTR {ctr}%.",
+        f"Average position {position:g}; conservative expected CTR {expected_ctr}% suggests ~{incremental_clicks:.0f} incremental-click upside.",
+    ]
+    if query:
+        evidence.append(f"Underperforming query: {query}")
+    return make_issue(
+        f"High-impression page with low CTR: {raw_target}",
+        severity_from_score(score),
+        confidence,
+        evidence,
+        "meta_tags",
+        target=raw_target,
+        base_priority=impact_score,
+        expected_click_delta=round(incremental_clicks, 1),
+        priority_score=round(score, 3),
+        score_components={
+            "expected_impact": round(impact_score, 3),
+            "confidence_score": confidence,
+            "goal_alignment_score": goal_alignment_score,
+            "actionability_score": actionability_score,
+            "url_quality_score": url_quality,
+        },
+        operator_judgment_notes=["clear snippet/title lever with measurable upside", *goal_notes],
+    )
+
+
+def cannibalization_issue(cannibal: dict[str, Any], brand_terms: list[str] | None = None) -> dict[str, Any]:
+    raw_target = cannibal.get("winner_page")
+    impressions = float(cannibal.get("total_impressions") or 0)
+    clicks = float(cannibal.get("total_clicks") or 0)
+    impact_score = clamp(impressions / 5000, 0.05, 1.4)
+    confidence = sample_confidence(clicks=clicks, impressions=impressions)
+    actionability_score = 0.65
+    url_quality = float(url_context(raw_target)["url_quality_score"])
+    goal_alignment_score, goal_notes = goal_alignment_for_query(cannibal.get("query"), brand_terms)
+    score = impact_score * confidence * goal_alignment_score * actionability_score * url_quality
+    loser_pages = cannibal.get("loser_pages", [])
+    return make_issue(
+        f"Cannibalization on query '{cannibal.get('query')}'",
+        severity_from_score(score),
+        confidence,
+        [
+            f"Winner page: {raw_target}",
+            f"Competing pages: {', '.join(loser_pages[:8])}{'...' if len(loser_pages) > 8 else ''}",
+            f"Affected query set: {impressions:g} impressions and {clicks:g} clicks.",
+        ],
+        "internal_links",
+        target=raw_target,
+        base_priority=impact_score,
+        expected_click_delta=None,
+        priority_score=round(score, 3),
+        score_components={
+            "expected_impact": round(impact_score, 3),
+            "confidence_score": confidence,
+            "goal_alignment_score": goal_alignment_score,
+            "actionability_score": actionability_score,
+            "url_quality_score": url_quality,
+        },
+        operator_judgment_notes=["needs intent review before redirects/canonicals", *goal_notes],
+    )
+
+
+def query_ctr_issue(opp: dict[str, Any], brand_terms: list[str] | None = None) -> dict[str, Any]:
+    impressions = float(opp.get("impressions") or 0)
+    clicks = float(opp.get("clicks") or 0)
+    ctr = float(opp.get("ctr") or 0)
+    position = float(opp.get("position") or 0)
+    expected_ctr = expected_ctr_for_position(position)
+    incremental_clicks = max(impressions * ((expected_ctr - ctr) / 100), 0.0)
+    impact_score = clamp(incremental_clicks / 65, 0.05, 1.3)
+    confidence = sample_confidence(clicks=clicks, impressions=impressions)
+    actionability_score = 0.55  # Query-only; needs page mapping before editing.
+    goal_alignment_score, goal_notes = goal_alignment_for_query(opp.get("query"), brand_terms)
+    score = impact_score * confidence * goal_alignment_score * actionability_score
+    return make_issue(
+        f"Query-level CTR opportunity: {opp.get('query')}",
+        severity_from_score(score),
+        confidence,
+        [
+            f"{impressions:g} impressions with CTR {ctr}%.",
+            f"Average position {position:g}; conservative expected CTR {expected_ctr}% suggests ~{incremental_clicks:.0f} incremental-click upside.",
+        ],
+        "meta_tags",
+        base_priority=impact_score,
+        expected_click_delta=round(incremental_clicks, 1),
+        priority_score=round(score, 3),
+        score_components={
+            "expected_impact": round(impact_score, 3),
+            "confidence_score": confidence,
+            "goal_alignment_score": goal_alignment_score,
+            "actionability_score": actionability_score,
+            "url_quality_score": 1.0,
+        },
+        operator_judgment_notes=["query-level signal; map to a page before editing", *goal_notes],
+    )
+
+
+def declining_query_issue(query: dict[str, Any], brand_terms: list[str] | None = None) -> dict[str, Any]:
+    clicks_now = float(query.get("clicks_now") or 0)
+    clicks_prev = float(query.get("clicks_prev") or 0)
+    lost_clicks = max(clicks_prev - clicks_now, 0.0)
+    confidence = sample_confidence(clicks=clicks_prev + clicks_now)
+    impact_score = clamp(lost_clicks / 50, 0.05, 1.0)
+    actionability_score = 0.5
+    goal_alignment_score, goal_notes = goal_alignment_for_query(query.get("query"), brand_terms)
+    score = impact_score * confidence * goal_alignment_score * actionability_score
+    return make_issue(
+        f"Query demand fell for '{query.get('query')}'",
+        severity_from_score(score),
+        confidence,
+        [
+            f"Clicks changed {query.get('change_pct')}% vs prior period.",
+            f"Current clicks: {clicks_now:g} | previous clicks: {clicks_prev:g} | lost clicks: {lost_clicks:g}",
+        ],
+        "content_refresh",
+        base_priority=impact_score,
+        expected_click_delta=round(-lost_clicks, 1),
+        priority_score=round(score, 3),
+        score_components={
+            "expected_impact": round(impact_score, 3),
+            "confidence_score": confidence,
+            "goal_alignment_score": goal_alignment_score,
+            "actionability_score": actionability_score,
+            "url_quality_score": 1.0,
+        },
+        operator_judgment_notes=["query-level regression; needs SERP/page diagnosis before editing", *goal_notes],
+    )
+
+
+def dedupe_candidates(candidates: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    by_key: dict[str, dict[str, Any]] = {}
+    for candidate in candidates:
+        key = candidate.get("canonical_target") or candidate.get("title")
+        existing = by_key.get(key)
+        if not existing or candidate.get("priority_score", 0) > existing.get("priority_score", 0):
+            by_key[key] = candidate
+        elif existing:
+            existing.setdefault("operator_judgment_notes", []).append(f"Also saw signal: {candidate['title']}")
+    return list(by_key.values())
 
 
 def derive_candidate_issues(data: dict[str, Any]) -> list[dict[str, Any]]:
@@ -89,106 +414,29 @@ def derive_candidate_issues(data: dict[str, Any]) -> list[dict[str, Any]]:
     ctr_opps = data.get("ctr_opportunities") or []
     declining_pages = comparison.get("declining_pages") or []
     declining_queries = comparison.get("declining_queries") or []
+    brand_terms = data.get("_brand_terms") or []
 
-    if declining_pages:
-        page = declining_pages[0]
-        issues.append(
-            make_issue(
-                f"Traffic dropped on {page.get('page')}",
-                "critical",
-                0.84,
-                [
-                    f"Clicks changed {page.get('change_pct')}% vs prior period.",
-                    f"Current clicks: {page.get('clicks_now')} | previous clicks: {page.get('clicks_prev')}",
-                ],
-                "page_improvement",
-                target=page.get("page"),
-                base_priority=0.95,
-            )
-        )
+    issues.extend(decline_issue(page) for page in declining_pages[:8])
+    issues.extend(ctr_gap_issue(gap, brand_terms) for gap in ctr_gaps[:8])
+    issues.extend(cannibalization_issue(cannibal, brand_terms) for cannibal in cannibalization[:5])
+    issues.extend(query_ctr_issue(opp, brand_terms) for opp in ctr_opps[:5])
+    issues.extend(declining_query_issue(query, brand_terms) for query in declining_queries[:5])
 
-    if ctr_gaps:
-        gap = ctr_gaps[0]
-        issues.append(
-            make_issue(
-                f"High-impression page with low CTR: {gap.get('page')}",
-                "warning",
-                0.78,
-                [
-                    f"{gap.get('impressions')} impressions with CTR {gap.get('ctr')}%.",
-                    f"Average position {gap.get('position')} suggests snippet improvements may help.",
-                ],
-                "meta_tags",
-                target=gap.get("page"),
-                base_priority=0.8,
-            )
-        )
-
-    if cannibalization:
-        cannibal = cannibalization[0]
-        issues.append(
-            make_issue(
-                f"Cannibalization on query '{cannibal.get('query')}'",
-                "warning",
-                0.73,
-                [
-                    f"Winner page: {cannibal.get('winner_page')}",
-                    f"Competing pages: {', '.join(cannibal.get('loser_pages', []))}",
-                ],
-                "internal_links",
-                target=cannibal.get("winner_page"),
-                base_priority=0.72,
-            )
-        )
-
-    if ctr_opps:
-        opp = ctr_opps[0]
-        issues.append(
-            make_issue(
-                f"Query-level CTR opportunity: {opp.get('query')}",
-                "info",
-                0.68,
-                [
-                    f"{opp.get('impressions')} impressions with CTR {opp.get('ctr')}%.",
-                    f"Average position {opp.get('position')}.",
-                ],
-                "meta_tags",
-                base_priority=0.64,
-            )
-        )
-
-    if declining_queries:
-        query = declining_queries[0]
-        issues.append(
-            make_issue(
-                f"Query demand fell for '{query.get('query')}'",
-                "warning",
-                0.66,
-                [
-                    f"Clicks changed {query.get('change_pct')}% vs prior period.",
-                    f"Current clicks: {query.get('clicks_now')} | previous clicks: {query.get('clicks_prev')}",
-                ],
-                "content_refresh",
-                base_priority=0.62,
-            )
-        )
-
-    return issues
+    return dedupe_candidates(issues)
 
 
 def apply_prioritization(candidates: list[dict[str, Any]], learned: dict[str, Any], primary_metric: str) -> list[dict[str, Any]]:
-    severity_weight = {"critical": 1.0, "warning": 0.75, "info": 0.45}
     ranked = []
     for item in candidates:
         multiplier = learned_multiplier(learned, item["recommended_action_type"], primary_metric)
-        score = item.get("base_priority", 0.5) * severity_weight.get(item.get("severity", "warning"), 0.6) * multiplier * (0.6 + item.get("confidence", 0.5))
+        score = float(item.get("priority_score", item.get("base_priority", 0.5))) * multiplier
         enriched = dict(item)
         enriched["priority_score"] = round(score, 3)
         enriched["learned_multiplier"] = multiplier
+        enriched["severity"] = severity_from_score(score)
         ranked.append(enriched)
     ranked.sort(key=lambda issue: issue["priority_score"], reverse=True)
     return ranked
-
 
 def build_payload(site_id: str, analysis: dict[str, Any], learned: dict[str, Any], goal: dict[str, Any] | None) -> dict[str, Any]:
     metrics = metric_snapshot_from_analysis(analysis)
@@ -226,35 +474,51 @@ def build_payload(site_id: str, analysis: dict[str, Any], learned: dict[str, Any
     for idx, issue in enumerate(top_issues, start=1):
         action_id = f"weekly_action_{idx:02d}"
         action_type = issue["recommended_action_type"]
+        expected_delta = issue.get("expected_click_delta")
+        expected_impact = f"Address {action_type.replace('_', ' ')} opportunity surfaced in the weekly review."
+        if isinstance(expected_delta, (int, float)) and expected_delta > 0:
+            expected_impact = f"Estimated upside: ~{expected_delta:g} incremental clicks if the opportunity is fixed."
+        elif isinstance(expected_delta, (int, float)) and expected_delta < 0:
+            expected_impact = f"Regression signal: ~{abs(expected_delta):g} lost clicks vs prior period; investigate before changing content."
         action_entries.append(
             {
                 "action_id": action_id,
                 "title": issue["title"],
                 "type": action_type,
                 "priority_score": issue["priority_score"],
-                "expected_impact": f"Address {action_type.replace('_', ' ')} opportunity surfaced in the weekly review.",
+                "expected_impact": expected_impact,
                 "requires_approval": action_type not in {"manual_review"},
                 "reversibility": "high",
                 "owner": "operator",
                 "target": issue.get("target"),
+                "raw_target": issue.get("raw_target"),
+                "canonical_target": issue.get("canonical_target"),
+                "score_components": issue.get("score_components", {}),
+                "operator_judgment_notes": issue.get("operator_judgment_notes", []),
                 "learned_multiplier": issue.get("learned_multiplier", 1.0),
             }
         )
         if idx == 1 and action_type != "manual_review":
             queue_items.append(
                 {
-                    "item_id": f"followup_{site_id}_{action_type}_{analysis['period']['days']}d",
-                    "type": "feedback_check",
-                    "status": "pending",
-                    "due_at": future_iso(14),
-                    "notes": f"Review the impact of the weekly action: {issue['title']}",
+                    "item_id": f"proposal_{site_id}_{action_type}_{analysis['period']['days']}d",
+                    "type": "action_proposal",
+                    "status": "pending_approval",
+                    "notes": f"Approve, reject, or revise the weekly action: {issue['title']}",
+                    "action_id": action_id,
                     "action_type": action_type,
                     "target": issue.get("target"),
+                    "raw_target": issue.get("raw_target"),
+                    "canonical_target": issue.get("canonical_target"),
                     "primary_metric": primary_metric,
                     "primary_direction": "higher_better" if "position" not in primary_metric else "lower_better",
                     "success_threshold_pct": 0.1,
                     "baseline_metrics": metrics,
                     "guardrail_metrics": [],
+                    "follow_up_after_approval_days": 14,
+                    "approval_required": True,
+                    "score_components": issue.get("score_components", {}),
+                    "operator_judgment_notes": issue.get("operator_judgment_notes", []),
                 }
             )
 
@@ -293,6 +557,11 @@ def build_payload(site_id: str, analysis: dict[str, Any], learned: dict[str, Any
             "checks": [
                 {"name": "gsc analysis available", "status": "pass", "notes": "Weekly review generated from Search Console data."},
                 {"name": "action plan generated", "status": "pass", "notes": f"Primary metric for follow-up scoring: {primary_metric}."},
+                {
+                    "name": "recommendation quality gate",
+                    "status": "pass" if top_issues[0].get("priority_score", 0) >= 0.35 else "warning",
+                    "notes": "; ".join(top_issues[0].get("operator_judgment_notes", [])) or "Top action has explicit score components for operator review.",
+                },
             ],
             "follow_up_due": None,
         },
@@ -336,6 +605,7 @@ def main(argv: list[str]) -> int:
         brand_terms = args.brand_terms if args.brand_terms is not None else ",".join(profile.get("brand_terms", []))
         analysis = run_analysis(site_property, args.days, brand_terms)
 
+    analysis["_brand_terms"] = profile.get("brand_terms", [])
     payload = build_payload(site_id, analysis, learned, active_goal)
     result = persist_payload(args.site, payload, root=root)
     result["primary_metric"] = payload["queue_items"][0]["primary_metric"] if payload.get("queue_items") else None

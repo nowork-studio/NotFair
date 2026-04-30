@@ -322,16 +322,34 @@ class TestPeriodComparison(unittest.TestCase):
         )
         self.assertLess(result['declining_pages'][0]['change_pct'], 0)
 
-    def test_result_sorted_by_change_pct_ascending(self):
+    def test_result_sorted_by_absolute_click_loss_first(self):
         result = self._run_comparison(
-            curr_pages={'/a': 20, '/b': 10},
-            prev_pages={'/a': 100, '/b': 100},  # /b drops more
+            curr_pages={'/tiny-percent-drop': 3, '/bigger-loss': 58},
+            prev_pages={'/tiny-percent-drop': 13, '/bigger-loss': 103},
             curr_queries={},
             prev_queries={},
         )
         pages = result['declining_pages']
-        if len(pages) >= 2:
-            self.assertLessEqual(pages[0]['change_pct'], pages[1]['change_pct'])
+        self.assertEqual(pages[0]['page'], '/bigger-loss')
+        self.assertEqual(pages[0]['absolute_click_loss'], 45)
+        self.assertEqual(pages[1]['absolute_click_loss'], 10)
+
+    def test_period_comparison_includes_richer_metadata(self):
+        result = self._run_comparison(
+            curr_pages={'/page': 40},
+            prev_pages={'/page': 100},
+            curr_queries={'keyword': 30},
+            prev_queries={'keyword': 60},
+        )
+        page = result['declining_pages'][0]
+        self.assertEqual(page['click_delta'], -60)
+        self.assertEqual(page['absolute_click_loss'], 60)
+        self.assertIn('impressions_now', page)
+        self.assertIn('ctr_now', page)
+        self.assertIn('position_now', page)
+        query = result['declining_queries'][0]
+        self.assertEqual(query['click_delta'], -30)
+        self.assertEqual(query['absolute_click_loss'], 30)
 
 
 class TestGscQueryErrorHandling(unittest.TestCase):

@@ -213,9 +213,18 @@ def pull_period_comparison(token, site, days):
                     "page": page,
                     "clicks_now": curr["clicks"],
                     "clicks_prev": prev["clicks"],
-                    "change_pct": pct
+                    "click_delta": delta,
+                    "absolute_click_loss": abs(delta),
+                    "change_pct": pct,
+                    "impressions_now": curr.get("impressions", 0),
+                    "impressions_prev": prev.get("impressions", 0),
+                    "impression_delta": curr.get("impressions", 0) - prev.get("impressions", 0),
+                    "ctr_now": round(curr.get("ctr", 0) * 100, 2),
+                    "ctr_prev": round(prev.get("ctr", 0) * 100, 2),
+                    "position_now": round(curr.get("position", 0), 1),
+                    "position_prev": round(prev.get("position", 0), 1),
                 })
-    page_changes.sort(key=lambda x: x["change_pct"])
+    page_changes.sort(key=lambda x: (-x.get("absolute_click_loss", 0), x["change_pct"]))
 
     # Queries comparison
     curr_q = fetch(start_curr, end_curr, "query")
@@ -232,9 +241,18 @@ def pull_period_comparison(token, site, days):
                     "query": q,
                     "clicks_now": curr["clicks"],
                     "clicks_prev": prev["clicks"],
-                    "change_pct": pct
+                    "click_delta": delta,
+                    "absolute_click_loss": abs(delta),
+                    "change_pct": pct,
+                    "impressions_now": curr.get("impressions", 0),
+                    "impressions_prev": prev.get("impressions", 0),
+                    "impression_delta": curr.get("impressions", 0) - prev.get("impressions", 0),
+                    "ctr_now": round(curr.get("ctr", 0) * 100, 2),
+                    "ctr_prev": round(prev.get("ctr", 0) * 100, 2),
+                    "position_now": round(curr.get("position", 0), 1),
+                    "position_prev": round(prev.get("position", 0), 1),
                 })
-    query_changes.sort(key=lambda x: x["change_pct"])
+    query_changes.sort(key=lambda x: (-x.get("absolute_click_loss", 0), x["change_pct"]))
 
     return {
         "period": f"{start_curr.isoformat()} to {end_curr.isoformat()}",
