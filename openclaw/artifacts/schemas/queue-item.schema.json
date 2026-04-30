@@ -17,8 +17,10 @@
       "enum": [
         "pending",
         "in_progress",
+        "ready_for_attention",
         "blocked",
-        "done"
+        "done",
+        "processed"
       ]
     },
     "due_at": {

@@ -9,6 +9,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
+TERMINAL_QUEUE_STATUSES = {"done", "processed"}
+
 
 def workspace_root() -> Path:
     configured = os.environ.get("TOPRANK_OPENCLAW_HOME")
@@ -144,7 +146,15 @@ def upsert_schedule_items(items: list[dict[str, Any]], root: Path | None = None)
         item_id = item.get("item_id")
         if not item_id:
             continue
-        existing = next((entry for entry in upcoming if entry.get("item_id") == item_id), None)
+        site_id = item.get("site_id")
+        existing = next(
+            (
+                entry
+                for entry in upcoming
+                if entry.get("item_id") == item_id and (site_id is None or entry.get("site_id") == site_id)
+            ),
+            None,
+        )
         if existing is None:
             upcoming.append(item)
             written.append(item)
@@ -154,6 +164,58 @@ def upsert_schedule_items(items: list[dict[str, Any]], root: Path | None = None)
 
     save_json(schedule_path, schedule)
     return written
+
+
+def reconcile_schedule_from_queue(root: Path | None = None, schedule: dict[str, Any] | None = None) -> tuple[dict[str, Any], list[dict[str, Any]]]:
+    """Restore scheduled work from per-site queue files.
+
+    Queue files are the durable per-site task records. `schedule.json` is an
+    index used by the runner, so a missing schedule entry should not make a
+    pending queue item disappear from backend processing.
+    """
+    root = bootstrap_workspace(root)
+    if schedule is None:
+        schedule = load_json(root / "schedule.json", {"schema_version": "1", "upcoming": []})
+    upcoming = schedule.setdefault("upcoming", [])
+    restored: list[dict[str, Any]] = []
+
+    existing_by_key = {
+        (entry.get("site_id"), entry.get("item_id")): entry
+        for entry in upcoming
+        if entry.get("site_id") and entry.get("item_id")
+    }
+
+    sites_dir = root / "sites"
+    if not sites_dir.exists():
+        return schedule, restored
+
+    for queue_path in sites_dir.glob("*/queue/*.json"):
+        try:
+            item = load_json(queue_path, {})
+        except json.JSONDecodeError:
+            continue
+        if not isinstance(item, dict):
+            continue
+        if not item.get("due_at"):
+            continue
+        status = item.get("status", "pending")
+        if status in TERMINAL_QUEUE_STATUSES:
+            continue
+
+        site_id = item.get("site_id") or queue_path.parents[1].name
+        item_id = item.get("item_id") or queue_path.stem
+        item["site_id"] = site_id
+        item["item_id"] = item_id
+        key = (site_id, item_id)
+        existing = existing_by_key.get(key)
+        if existing is None:
+            upcoming.append(dict(item))
+            existing_by_key[key] = upcoming[-1]
+            restored.append(upcoming[-1])
+        elif existing.get("status") not in TERMINAL_QUEUE_STATUSES:
+            existing.update(item)
+
+    return schedule, restored
 
 
 def upsert_portfolio_site(

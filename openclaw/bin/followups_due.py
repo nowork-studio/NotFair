@@ -13,14 +13,17 @@ CURRENT_DIR = Path(__file__).resolve().parent
 if str(CURRENT_DIR) not in sys.path:
     sys.path.insert(0, str(CURRENT_DIR))
 
-from runtime import bootstrap_workspace, load_json, now_iso, workspace_root
+from runtime import bootstrap_workspace, load_json, now_iso, reconcile_schedule_from_queue, save_json, workspace_root
 
 
 def parse_iso(value: str | None) -> datetime:
     if not value:
         return datetime.max.replace(tzinfo=timezone.utc)
     normalized = value.replace("Z", "+00:00")
-    return datetime.fromisoformat(normalized)
+    parsed = datetime.fromisoformat(normalized)
+    if parsed.tzinfo is None:
+        return parsed.replace(tzinfo=timezone.utc)
+    return parsed
 
 
 def main(argv: list[str]) -> int:
@@ -31,11 +34,16 @@ def main(argv: list[str]) -> int:
     args = parser.parse_args(argv[1:])
 
     root = bootstrap_workspace(workspace_root())
-    schedule = load_json(root / "schedule.json", {"upcoming": []})
+    schedule_path = root / "schedule.json"
+    schedule = load_json(schedule_path, {"upcoming": []})
+    schedule, restored_from_queue = reconcile_schedule_from_queue(root, schedule)
+    save_json(schedule_path, schedule)
     cutoff = parse_iso(args.as_of)
 
     items = []
     for item in schedule.get("upcoming", []):
+        if item.get("status") in {"done", "processed"}:
+            continue
         if args.site and item.get("site_id") != args.site:
             continue
         due_at = parse_iso(item.get("due_at"))
@@ -49,6 +57,7 @@ def main(argv: list[str]) -> int:
         "site_filter": args.site,
         "count": len(items),
         "items": items,
+        "restored_from_queue": restored_from_queue,
     }
     print(json.dumps(result, indent=2))
     return 0

@@ -14,14 +14,17 @@ if str(CURRENT_DIR) not in sys.path:
     sys.path.insert(0, str(CURRENT_DIR))
 
 from persist_run import persist_payload
-from runtime import bootstrap_workspace, load_json, now_iso, save_json, update_learned_patterns, workspace_root
+from runtime import bootstrap_workspace, load_json, now_iso, reconcile_schedule_from_queue, save_json, update_learned_patterns, workspace_root
 from score_feedback import score_item
 
 
 def parse_iso(value: str | None) -> datetime:
     if not value:
         return datetime.max.replace(tzinfo=timezone.utc)
-    return datetime.fromisoformat(value.replace('Z', '+00:00'))
+    parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+    if parsed.tzinfo is None:
+        return parsed.replace(tzinfo=timezone.utc)
+    return parsed
 
 
 def update_queue_file(root: Path, item: dict, **updates) -> str | None:
@@ -38,12 +41,12 @@ def update_queue_file(root: Path, item: dict, **updates) -> str | None:
     return str(queue_path)
 
 
-def build_feedback_payload(item: dict, root: Path) -> dict:
+def build_feedback_payload(item: dict, root: Path, score: dict | None = None) -> dict:
     site_id = item["site_id"]
     latest = load_json(root / "sites" / site_id / "latest-state.json", {"summary": "No recent state summary.", "open_issues": []})
     summary = item.get("notes") or latest.get("summary") or "Scheduled follow-up review."
     action_id = item.get("item_id", "feedback_check")
-    score = score_item(item)
+    score = score or score_item(item)
     outcome = score.get("outcome", "inconclusive")
     reason = score.get("reason", "no scoring reason available")
     score_summary = f"Feedback outcome: {outcome}. Reason: {reason}."
@@ -126,6 +129,25 @@ def build_feedback_payload(item: dict, root: Path) -> dict:
     }
 
 
+def mark_for_attention(root: Path, item: dict, reason: str) -> dict:
+    item["status"] = "ready_for_attention"
+    item["surfaced_at"] = now_iso()
+    item["attention_reason"] = reason
+    update_queue_file(
+        root,
+        item,
+        status="ready_for_attention",
+        surfaced_at=item["surfaced_at"],
+        attention_reason=reason,
+    )
+    return {
+        "item_id": item.get("item_id"),
+        "site_id": item.get("site_id"),
+        "type": item.get("type"),
+        "reason": reason,
+    }
+
+
 def main(argv: list[str]) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--site")
@@ -136,6 +158,7 @@ def main(argv: list[str]) -> int:
     root = bootstrap_workspace(workspace_root())
     schedule_path = root / "schedule.json"
     schedule = load_json(schedule_path, {"schema_version": "1", "upcoming": []})
+    schedule, restored_from_queue = reconcile_schedule_from_queue(root, schedule)
     upcoming = schedule.setdefault("upcoming", [])
     as_of_dt = parse_iso(args.as_of)
 
@@ -152,9 +175,32 @@ def main(argv: list[str]) -> int:
 
         if item.get("type") == "feedback_check":
             if args.dry_run:
-                processed.append({"item_id": item.get("item_id"), "site_id": item.get("site_id"), "dry_run": True})
+                score = score_item(item)
+                if score.get("outcome") == "inconclusive":
+                    manual_attention.append(
+                        {
+                            "item_id": item.get("item_id"),
+                            "site_id": item.get("site_id"),
+                            "type": item.get("type"),
+                            "reason": score.get("reason", "feedback scoring was inconclusive"),
+                            "dry_run": True,
+                        }
+                    )
+                else:
+                    processed.append(
+                        {
+                            "item_id": item.get("item_id"),
+                            "site_id": item.get("site_id"),
+                            "outcome": score.get("outcome"),
+                            "dry_run": True,
+                        }
+                    )
                 continue
-            payload = build_feedback_payload(item, root)
+            score = score_item(item)
+            if score.get("outcome") == "inconclusive":
+                manual_attention.append(mark_for_attention(root, item, score.get("reason", "feedback scoring was inconclusive")))
+                continue
+            payload = build_feedback_payload(item, root, score)
             result = persist_payload(item["site_id"], payload, root=root)
             feedback_outcome = payload.get("feedback", {}).get("outcome", "inconclusive")
             item["status"] = "processed"
@@ -185,10 +231,7 @@ def main(argv: list[str]) -> int:
             )
             processed.append({"item_id": item.get("item_id"), "site_id": item.get("site_id"), "result_run_dir": result["run_dir"], "outcome": feedback_outcome})
         else:
-            item["status"] = "ready_for_attention"
-            item["surfaced_at"] = now_iso()
-            update_queue_file(root, item, status="ready_for_attention", surfaced_at=item["surfaced_at"])
-            manual_attention.append({"item_id": item.get("item_id"), "site_id": item.get("site_id"), "type": item.get("type")})
+            manual_attention.append(mark_for_attention(root, item, f"unsupported schedule item type: {item.get('type')}"))
 
     if not args.dry_run:
         save_json(schedule_path, schedule)
@@ -198,6 +241,7 @@ def main(argv: list[str]) -> int:
         "as_of": args.as_of,
         "processed": processed,
         "manual_attention": manual_attention,
+        "restored_from_queue": restored_from_queue,
         "dry_run": args.dry_run,
     }
     print(json.dumps(result, indent=2))
