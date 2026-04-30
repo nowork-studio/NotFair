@@ -140,6 +140,57 @@ class TestParseInspectionResult(unittest.TestCase):
         result = ui.parse_inspection_result(raw, "https://example.com/page")
         self.assertEqual(result["index_status"]["referring_sitemaps"], [])
 
+    def test_non_dict_response_returns_default_shape(self):
+        result = ui.parse_inspection_result([], "https://example.com/")
+
+        self.assertEqual(result["url"], "https://example.com/")
+        self.assertEqual(result["index_status"]["verdict"], "UNKNOWN")
+        self.assertEqual(result["index_status"]["coverage_state"], "UNKNOWN")
+        self.assertEqual(result["index_status"]["referring_sitemaps"], [])
+        self.assertEqual(result["mobile_usability"]["verdict"], "VERDICT_UNSPECIFIED")
+        self.assertEqual(result["mobile_usability"]["issues"], [])
+        self.assertEqual(result["rich_results"]["verdict"], "VERDICT_UNSPECIFIED")
+        self.assertEqual(result["rich_results"]["detected_items"], [])
+
+    def test_malformed_nested_shapes_are_ignored_without_dropping_valid_items(self):
+        raw = {
+            "inspectionResult": {
+                "indexStatusResult": "unexpected",
+                "mobileUsabilityResult": {
+                    "verdict": "MOBILE_FRIENDLY",
+                    "issues": [None, {"issueType": "TEXT_TOO_SMALL"}, "bad"],
+                },
+                "richResultsResult": {
+                    "verdict": "PASS",
+                    "detectedItems": [
+                        None,
+                        {
+                            "items": [
+                                None,
+                                {
+                                    "name": "FAQ",
+                                    "issues": [None, {"issueMessage": "Missing field"}, "bad"],
+                                },
+                                "bad",
+                            ]
+                        },
+                        "bad",
+                    ],
+                },
+            }
+        }
+
+        result = ui.parse_inspection_result(raw, "https://example.com/page")
+
+        self.assertEqual(result["index_status"]["verdict"], "UNKNOWN")
+        self.assertEqual(result["mobile_usability"]["verdict"], "MOBILE_FRIENDLY")
+        self.assertEqual(result["mobile_usability"]["issues"], ["TEXT_TOO_SMALL"])
+        self.assertEqual(result["rich_results"]["verdict"], "PASS")
+        self.assertEqual(
+            result["rich_results"]["detected_items"],
+            [{"name": "FAQ", "issues": ["Missing field"]}],
+        )
+
 
 class TestSummarizeFindings(unittest.TestCase):
     """summarize_findings() aggregates inspection results into high-level counts."""
