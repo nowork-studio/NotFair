@@ -210,6 +210,14 @@ def build_payload(site_id: str, analysis: dict[str, Any], learned: dict[str, Any
             base_priority=0.3,
         )
     ]
+    top_issues = [
+        {
+            **issue,
+            "priority_score": issue.get("priority_score", round(issue.get("base_priority", 0.3), 3)),
+            "learned_multiplier": issue.get("learned_multiplier", 1.0),
+        }
+        for issue in top_issues
+    ]
 
     summary = analysis.get("summary") or {}
     non_brand_clicks = metrics.get(primary_metric)

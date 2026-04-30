@@ -56,7 +56,7 @@ export TOPRANK_OPENCLAW_HOME=/custom/path
 
 ## Install
 
-The wrappers are designed to be **symlinked** into `~/.openclaw/skills/` so they can still resolve the canonical `seo/` skills in this repo.
+Run from the Toprank repo root:
 
 ```bash
 ./openclaw/install/install.sh
@@ -66,7 +66,68 @@ That script:
 
 1. creates `~/.toprank/openclaw/` if needed,
 2. bootstraps `portfolio.json` and `schedule.json`,
-3. symlinks all `openclaw/skills/*` into `~/.openclaw/skills/`.
+3. copies all OpenClaw wrapper skills into `~/.openclaw/skills/`,
+4. links support paths so the wrappers can still resolve this repo's canonical `seo/` skills.
+
+Why copy instead of symlink wrapper skills directly? OpenClaw skill discovery intentionally rejects symlinks that escape the configured skill root. The installer copies wrappers into the OpenClaw skill root and uses stable support links for repo-relative files.
+
+Verify:
+
+```bash
+openclaw skills check | grep -i toprank
+python3 -m pytest -q openclaw/tests
+```
+
+## Paste this into OpenClaw
+
+Use this as the setup prompt for a fresh machine or a new OpenClaw instance. Replace the placeholders before pasting.
+
+```text
+Set up the Toprank OpenClaw SEO Operator on this machine.
+
+Repo:
+- If the Toprank repo already exists locally, use it; do not reclone.
+- Otherwise clone https://github.com/nowork-studio/toprank and cd into the repo root.
+
+Install:
+1. Run: ./openclaw/install/install.sh
+2. Verify Toprank skills are discoverable: openclaw skills check | grep -i toprank
+3. Run tests: python3 -m pytest -q openclaw/tests
+
+Sites:
+- Register these sites if they are not already in ~/.toprank/openclaw/portfolio.json:
+  - <site_id_1> with GSC property <gsc_property_1>
+  - <site_id_2> with GSC property <gsc_property_2>
+- If GSC properties are unknown, run:
+  python3 seo/seo-analysis/scripts/list_gsc_sites.py
+  Then update each site's ~/.toprank/openclaw/sites/<site_id>/site-profile.json with "gsc_property".
+
+Background wiring:
+- Install OpenClaw cron jobs with:
+  ./openclaw/install/install-openclaw-cron.sh --to "<delivery_destination>" --channel "<channel>" --thread-id "<optional_thread_id>"
+- If there is no chat delivery target, omit --to; the jobs should be installed with --no-deliver.
+- Do not pass --model unless you first verify the model is accepted by this OpenClaw instance's model allowlist.
+
+Smoke test:
+1. Run the scheduler once:
+   TOPRANK_OPENCLAW_HOME="$HOME/.toprank/openclaw" python3 openclaw/bin/run_scheduler.py
+2. Run one weekly review:
+   TOPRANK_OPENCLAW_HOME="$HOME/.toprank/openclaw" python3 openclaw/bin/weekly_review.py "<site_id_1>"
+3. Confirm the review wrote audit.json, action-plan.json, and verification.json under ~/.toprank/openclaw/sites/<site_id>/runs/.
+4. Confirm openclaw cron list shows Toprank OpenClaw Scheduler and one Toprank Weekly Review job per active site.
+
+Policy:
+- This is an SEO operator loop, not an auto-publisher.
+- Do not edit websites, CMS content, repos, or publish changes without explicit approval.
+- Weekly review jobs may propose actions and write artifacts only.
+
+Report back with:
+- installed skill names,
+- active sites and GSC properties,
+- cron job ids/schedules,
+- smoke-test artifact path,
+- any blockers.
+```
 
 ## Bootstrap a site work folder
 
@@ -186,7 +247,27 @@ What it does today:
 - updates `learned-patterns.json` with outcome priors,
 - surfaces unsupported due items as `ready_for_attention`.
 
-Install it on macOS with launchd:
+Install it with OpenClaw cron:
+
+```bash
+# With chat delivery for useful weekly-review summaries:
+./openclaw/install/install-openclaw-cron.sh \
+  --to "<delivery_destination>" \
+  --channel telegram \
+  --thread-id "<optional_thread_id>"
+
+# Without chat delivery:
+./openclaw/install/install-openclaw-cron.sh
+```
+
+The OpenClaw cron installer creates:
+
+- `Toprank OpenClaw Scheduler` — hourly follow-up processor
+- `Toprank Weekly Review — <site>` — one weekly review per active portfolio site
+
+It intentionally does not set a model by default. If you want a model override, pass `--model <provider/model>` only after confirming the local OpenClaw model allowlist accepts it.
+
+macOS `launchd` is still available as a lower-level alternative:
 
 ```bash
 ./openclaw/install/install-launchd.sh --write-only
@@ -194,7 +275,7 @@ Install it on macOS with launchd:
 ./openclaw/install/install-launchd.sh
 ```
 
-Or use the cron example at `openclaw/install/toprank-openclaw.cron.example`.
+Or use the system cron example at `openclaw/install/toprank-openclaw.cron.example`.
 
 This is now the core of a real autonomous operator loop.
 
