@@ -32,6 +32,90 @@ ANALYZE_GSC = Path(__file__).resolve().parents[2] / "seo" / "seo-analysis" / "sc
 DEFAULT_PRIMARY_METRIC = "non_brand_clicks_28d"
 
 
+SEO_BEST_PRACTICE_REFERENCE = "seo/shared/seo-best-practices.md"
+SEO_BEST_PRACTICE_AREAS: dict[str, dict[str, Any]] = {
+    "search_eligibility_indexability": {
+        "label": "Search eligibility & indexability",
+        "resources": [
+            "Google Search Essentials",
+            "Google Search Central SEO Starter Guide",
+        ],
+        "why": "Google must be able to discover, crawl, render, canonicalize, and index the right URL before content changes can work.",
+    },
+    "demand_intent_targeting": {
+        "label": "Demand & intent targeting",
+        "resources": [
+            "Ahrefs Beginner’s Guide to SEO",
+            "Moz Beginner’s Guide to SEO",
+            "Google helpful content guidance",
+        ],
+        "why": "The operator should first choose the valuable search demand and map each query intent to the page that should own it.",
+    },
+    "content_usefulness_trust": {
+        "label": "Content usefulness & trust",
+        "resources": [
+            "Google helpful, reliable, people-first content guidance",
+            "Google Search Quality concepts: E-E-A-T",
+        ],
+        "why": "Pages need original, complete, trustworthy information that satisfies the searcher, not just search-engine-first copy.",
+    },
+    "on_page_relevance_serp_packaging": {
+        "label": "On-page relevance & SERP packaging",
+        "resources": [
+            "Google Search Central SEO Starter Guide",
+            "Google structured data documentation",
+            "Moz Beginner’s Guide to SEO",
+        ],
+        "why": "Titles, headings, snippets, structured data, and above-the-fold packaging help users and search engines understand why the page is the right result.",
+    },
+    "technical_ux_page_experience": {
+        "label": "Technical UX & page experience",
+        "resources": [
+            "Google page experience documentation",
+            "Google Core Web Vitals guidance",
+        ],
+        "why": "Fast, secure, mobile-friendly, non-intrusive pages support better user outcomes and can contribute when helpful content is otherwise competitive.",
+    },
+    "authority_distribution": {
+        "label": "Authority & distribution",
+        "resources": [
+            "Ahrefs link building guidance",
+            "Moz link building guidance",
+            "Google Search Essentials promotion guidance",
+        ],
+        "why": "Competitive topics often need internal link equity, citations, mentions, or other legitimate reputation signals beyond page-level copy.",
+    },
+    "local_presence_reputation": {
+        "label": "Local presence & reputation",
+        "resources": [
+            "Google Business Profile local ranking guidance",
+            "Ahrefs local SEO guidance",
+        ],
+        "why": "Local rankings depend on relevance, distance, and prominence, including complete business information, reviews, photos, and locally specific proof.",
+    },
+    "measurement_prioritization_experimentation": {
+        "label": "Measurement, prioritization & experimentation",
+        "resources": [
+            "Google Search Central measurement guidance",
+            SEO_BEST_PRACTICE_REFERENCE,
+        ],
+        "why": "SEO work should be prioritized by expected business impact, measured against baselines, and followed up after enough data matures.",
+    },
+}
+
+ACTION_BEST_PRACTICE_AREAS = {
+    "canonical_or_tracking_investigation": "search_eligibility_indexability",
+    "query_intent_mapping": "demand_intent_targeting",
+    "local_intent_ownership": "demand_intent_targeting",
+    "content_refresh": "content_usefulness_trust",
+    "page_improvement": "content_usefulness_trust",
+    "meta_tags": "on_page_relevance_serp_packaging",
+    "snippet_content_packaging": "on_page_relevance_serp_packaging",
+    "internal_links": "authority_distribution",
+    "manual_review": "measurement_prioritization_experimentation",
+}
+
+
 def future_iso(days: int) -> str:
     return (datetime.now(timezone.utc) + timedelta(days=days)).replace(microsecond=0).isoformat().replace("+00:00", "Z")
 
@@ -194,6 +278,43 @@ def make_issue(
     return issue
 
 
+def best_practice_alignment_for_issue(issue: dict[str, Any]) -> dict[str, Any]:
+    """Attach the primary MECE SEO best-practice lane for operator review."""
+    action_type = str(issue.get("recommended_action_type") or "manual_review")
+    area_key = ACTION_BEST_PRACTICE_AREAS.get(action_type)
+    if area_key is None:
+        return {
+            "reference": SEO_BEST_PRACTICE_REFERENCE,
+            "primary_area": "unmapped",
+            "primary_area_label": "Unmapped SEO action type",
+            "resources": [SEO_BEST_PRACTICE_REFERENCE],
+            "notes": [
+                f"Action type '{action_type}' is not mapped to a MECE SEO best-practice lane.",
+                "Downgrade to investigation/manual review or update ACTION_BEST_PRACTICE_AREAS before treating this as an approved recommendation.",
+            ],
+        }
+
+    area = SEO_BEST_PRACTICE_AREAS[area_key]
+    notes = [area["why"]]
+
+    if action_type in {"meta_tags", "snippet_content_packaging"}:
+        notes.append("Validate the query/page/SERP fit before treating low CTR as a title or meta-description problem.")
+    elif action_type in {"query_intent_mapping", "local_intent_ownership"}:
+        notes.append("Resolve search intent ownership before changing content, redirects, canonicals, or metadata.")
+    elif action_type == "page_improvement":
+        notes.append("A regression is a diagnosis trigger; inspect content usefulness, SERP changes, and technical access before publishing edits.")
+    elif action_type == "internal_links":
+        notes.append("Use relevant internal links to clarify page ownership and distribute authority; do not jump straight to redirects.")
+    elif action_type == "canonical_or_tracking_investigation":
+        notes.append("Canonical/tracking variants should be investigated as URL hygiene before editing page copy.")
+
+    return {
+        "reference": SEO_BEST_PRACTICE_REFERENCE,
+        "primary_area": area_key,
+        "primary_area_label": area["label"],
+        "resources": area["resources"],
+        "notes": notes,
+    }
 
 
 
@@ -1203,6 +1324,7 @@ def build_payload(
             **issue,
             "priority_score": issue.get("priority_score", round(issue.get("base_priority", 0.3), 3)),
             "learned_multiplier": issue.get("learned_multiplier", 1.0),
+            "best_practice_alignment": best_practice_alignment_for_issue(issue),
         }
         for issue in top_issues
     ]
@@ -1241,6 +1363,7 @@ def build_payload(
                 "operator_judgment_notes": issue.get("operator_judgment_notes", []),
                 "deep_dive": issue.get("deep_dive"),
                 "business_context_adjustment": issue.get("business_context_adjustment"),
+                "best_practice_alignment": issue.get("best_practice_alignment"),
                 "consolidation_targets": issue.get("consolidation_targets"),
                 "source_target": issue.get("source_target"),
                 "needs_business_context": context_check["score"] < 0.75,
@@ -1270,6 +1393,7 @@ def build_payload(
                     "operator_judgment_notes": issue.get("operator_judgment_notes", []),
                     "deep_dive": issue.get("deep_dive"),
                     "business_context_adjustment": issue.get("business_context_adjustment"),
+                    "best_practice_alignment": issue.get("best_practice_alignment"),
                     "consolidation_targets": issue.get("consolidation_targets"),
                     "source_target": issue.get("source_target"),
                     "business_context_score": context_check["score"],
@@ -1327,6 +1451,13 @@ def build_payload(
                     "checks": top_issues[0].get("deep_dive", {}).get("checks", {}),
                 },
                 {
+                    "name": "best practice alignment",
+                    "status": "pass" if top_issues[0].get("best_practice_alignment", {}).get("primary_area") not in {None, "", "unmapped"} else "warning",
+                    "notes": top_issues[0].get("best_practice_alignment", {}).get("primary_area_label", "Top recommendation is not mapped to a MECE SEO best-practice lane."),
+                    "reference": SEO_BEST_PRACTICE_REFERENCE,
+                    "alignment": top_issues[0].get("best_practice_alignment", {}),
+                },
+                {
                     "name": "business impact context",
                     "status": context_check["status"],
                     "notes": f"Business-impact context completeness: {context_check['score']:.0%}. Missing: {', '.join(gap['field'] for gap in context_check['missing_fields']) or 'none'}.",
@@ -1372,6 +1503,7 @@ def build_user_message(site_id: str, result: dict[str, Any], payload: dict[str, 
             f"- Type: `{top_action.get('type')}`",
             f"- Target: `{top_action.get('target')}`",
             f"- Why: {top_action.get('expected_impact')}",
+            f"- Best-practice lane: `{(top_action.get('best_practice_alignment') or {}).get('primary_area_label', 'not mapped')}`",
             f"- Requires approval: {'yes' if top_action.get('requires_approval') else 'no'}",
         ])
         deep_dive = top_action.get("deep_dive") or {}

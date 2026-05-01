@@ -479,6 +479,84 @@ class WeeklyReviewScoringTest(unittest.TestCase):
         self.assertTrue(any(gap["field"] == "service_value_weights" for gap in context_request["business_context_gaps"]))
         self.assertTrue(context_request["business_context_questions"])
 
+    def test_action_proposal_includes_best_practice_alignment(self) -> None:
+        analysis = self.base_analysis()
+        analysis["ctr_gaps_by_page"] = [
+            {
+                "query": "roof repair cost",
+                "page": "https://www.example.com/blog/roof-repair-cost",
+                "clicks": 2,
+                "impressions": 1681,
+                "ctr": 0.12,
+                "position": 2.8,
+            }
+        ]
+
+        payload = weekly_review.build_payload("example.com", analysis, {"priors": {}}, None)
+        proposal = next(item for item in payload["queue_items"] if item["type"] == "action_proposal")
+        action = payload["action_plan"]["actions"][0]
+        check = next(item for item in payload["verification"]["checks"] if item["name"] == "best practice alignment")
+
+        self.assertEqual(check["status"], "pass")
+        self.assertEqual(proposal["best_practice_alignment"]["reference"], "seo/shared/seo-best-practices.md")
+        self.assertEqual(action["best_practice_alignment"]["primary_area"], "on_page_relevance_serp_packaging")
+        self.assertTrue(proposal["best_practice_alignment"]["resources"])
+
+    def test_all_current_action_types_have_best_practice_mapping(self) -> None:
+        expected_action_types = {
+            "canonical_or_tracking_investigation",
+            "query_intent_mapping",
+            "local_intent_ownership",
+            "content_refresh",
+            "page_improvement",
+            "meta_tags",
+            "snippet_content_packaging",
+            "internal_links",
+            "manual_review",
+        }
+
+        self.assertEqual(set(weekly_review.ACTION_BEST_PRACTICE_AREAS), expected_action_types)
+        for action_type, area in weekly_review.ACTION_BEST_PRACTICE_AREAS.items():
+            with self.subTest(action_type=action_type):
+                self.assertIn(area, weekly_review.SEO_BEST_PRACTICE_AREAS)
+                alignment = weekly_review.best_practice_alignment_for_issue({"recommended_action_type": action_type})
+                self.assertEqual(alignment["primary_area"], area)
+                self.assertNotEqual(alignment["primary_area"], "unmapped")
+
+    def test_unknown_action_type_warns_as_unmapped(self) -> None:
+        alignment = weekly_review.best_practice_alignment_for_issue({"recommended_action_type": "core_web_vitals"})
+
+        self.assertEqual(alignment["primary_area"], "unmapped")
+        self.assertEqual(alignment["primary_area_label"], "Unmapped SEO action type")
+        self.assertTrue(any("core_web_vitals" in note for note in alignment["notes"]))
+
+        analysis = self.base_analysis()
+        original = weekly_review.derive_candidate_issues
+        weekly_review.derive_candidate_issues = lambda _analysis: [
+            {
+                "title": "Future action",
+                "severity": "info",
+                "confidence": 0.5,
+                "evidence": ["synthetic"],
+                "recommended_action_type": "core_web_vitals",
+                "base_priority": 0.5,
+                "priority_score": 0.5,
+                "operator_judgment_notes": [],
+                "score_components": {},
+                "raw_target": None,
+                "canonical_target": None,
+            }
+        ]
+        try:
+            payload = weekly_review.build_payload("example.com", analysis, {"priors": {}}, None)
+        finally:
+            weekly_review.derive_candidate_issues = original
+
+        check = next(item for item in payload["verification"]["checks"] if item["name"] == "best practice alignment")
+        action = payload["action_plan"]["actions"][0]
+        self.assertEqual(check["status"], "warning")
+        self.assertEqual(action["best_practice_alignment"]["primary_area"], "unmapped")
+
 
 if __name__ == "__main__":
     unittest.main()
