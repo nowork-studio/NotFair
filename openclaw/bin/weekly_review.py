@@ -412,6 +412,22 @@ def is_branded_query(query: str | None, brand_terms: list[str] | None) -> bool:
     return any(term and term.lower() in q for term in brand_terms)
 
 
+SERVICE_PAGE_PATTERNS = re.compile(r"/(?:locations?|services?|pricing|booking|book|reserve|contact|about|faq|gallery|rates?|review|team|careers?|apply|shop|products?|dogs?-(?:boarding?|daycare|sitting?|grooming|training)|pet-(?:boarding?|daycare|sitting?|grooming|training))")
+
+
+def is_service_page(url: str | None) -> bool:
+    """True if the URL looks like a service/business page, not a blog or content article."""
+    if not url:
+        return False
+    path = urlparse(url).path.rstrip("/") or "/"
+    if re.search(r"/(?:blogs?|blog|news|articles?|posts?|journal|category|tag/|author/)", path):
+        return False
+    if bool(SERVICE_PAGE_PATTERNS.search(path)):
+        return True
+    # Short paths with no subdirectory are likely service pages (e.g. /dog-boarding, /)
+    return path.count("/") <= 2
+
+
 def goal_alignment_for_query(query: str | None, brand_terms: list[str] | None) -> tuple[float, list[str]]:
     if is_branded_query(query, brand_terms):
         return 0.35, ["branded/navigational query; lower priority for non-brand growth"]
@@ -576,7 +592,14 @@ def ctr_gap_issue(gap: dict[str, Any], brand_terms: list[str] | None = None) -> 
             "recommend SERP + snippet + above-the-fold content diagnosis before editing",
         ]
     url_quality = float(url_context(raw_target)["url_quality_score"])
-    goal_alignment_score, goal_notes = goal_alignment_for_query(query, brand_terms)
+    # For service pages, goal_alignment considers the page's role, not just the top
+    # underperforming query. A boarding page at position 1.2 with 943 impressions is
+    # inherently valuable — the branded query is just what's currently underperforming.
+    if is_service_page(raw_target) and is_branded_query(query, brand_terms):
+        goal_alignment_score = 1.0
+        goal_notes = ["service page; goal alignment based on page role, not gap query"]
+    else:
+        goal_alignment_score, goal_notes = goal_alignment_for_query(query, brand_terms)
     score = impact_score * confidence * goal_alignment_score * actionability_score * url_quality * business_intent_score
     evidence = [
         f"{impressions:g} impressions with CTR {ctr}%.",

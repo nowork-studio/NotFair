@@ -122,6 +122,38 @@ class WeeklyReviewScoringTest(unittest.TestCase):
         self.assertEqual(issue["score_components"]["business_intent_score"], 1.0)
         self.assertFalse(any("metadata alone is unproven" in note for note in issue["operator_judgment_notes"]))
 
+    def test_branded_gap_on_service_page_keeps_page_aligned(self) -> None:
+        issue = weekly_review.ctr_gap_issue(
+            {
+                "query": "example boarding",
+                "page": "https://www.example.com/dog-boarding",
+                "clicks": 91,
+                "impressions": 943,
+                "ctr": 9.65,
+                "position": 1.2,
+            },
+            ["example"],
+        )
+
+        self.assertEqual(issue["score_components"]["goal_alignment_score"], 1.0)
+        self.assertTrue(any("service page" in note for note in issue["operator_judgment_notes"]))
+
+    def test_branded_gap_on_blog_stays_lower_priority(self) -> None:
+        issue = weekly_review.ctr_gap_issue(
+            {
+                "query": "example boarding",
+                "page": "https://www.example.com/blog/dog-boarding-guide",
+                "clicks": 91,
+                "impressions": 943,
+                "ctr": 9.65,
+                "position": 1.2,
+            },
+            ["example"],
+        )
+
+        self.assertLess(issue["score_components"]["goal_alignment_score"], 1.0)
+        self.assertTrue(any("branded/navigational" in note for note in issue["operator_judgment_notes"]))
+
     def test_informational_ctr_gap_is_not_metadata_only(self) -> None:
         issue = weekly_review.ctr_gap_issue(
             {
