@@ -297,7 +297,9 @@ def best_practice_alignment_for_issue(issue: dict[str, Any]) -> dict[str, Any]:
     area = SEO_BEST_PRACTICE_AREAS[area_key]
     notes = [area["why"]]
 
-    if action_type in {"meta_tags", "snippet_content_packaging"}:
+    if action_type == "content_refresh":
+        notes.append("Content has lost ranking position; refresh with current data, intent alignment, and competitive comparison before republishing.")
+    elif action_type in {"meta_tags", "snippet_content_packaging"}:
         notes.append("Validate the query/page/SERP fit before treating low CTR as a title or meta-description problem.")
     elif action_type in {"query_intent_mapping", "local_intent_ownership"}:
         notes.append("Resolve search intent ownership before changing content, redirects, canonicals, or metadata.")
@@ -416,6 +418,61 @@ def goal_alignment_for_query(query: str | None, brand_terms: list[str] | None) -
     return 1.0, []
 
 
+def classify_regression_pattern(top_query: dict[str, Any]) -> tuple[str, str, list[str]]:
+    """Classify a losing query into an action type and best-practice area.
+
+    Examines which metric moved first to determine the root cause:
+
+    - Position drop + impression drop + CTR ~stable → ranking loss → content_refresh
+    - CTR drop + position stable + impressions ~stable → SERP displacement → snippet_content_packaging
+    - Impression drop + position stable + CTR stable → demand fade → query_intent_mapping
+    - Mixed/ambiguous → page_improvement (defer to operator)
+    """
+    pos_now = top_query.get("position_now")
+    pos_prev = top_query.get("position_prev")
+    pos_delta = None
+    if pos_now is not None and pos_prev is not None:
+        pos_delta = pos_now - pos_prev  # positive = rank dropped (higher number = worse)
+
+    ctr_now = top_query.get("ctr_now") or 0
+    ctr_prev = top_query.get("ctr_prev") or 0
+    ctr_delta = ctr_now - ctr_prev
+
+    impr_now = top_query.get("impressions_now", 0)
+    impr_prev = top_query.get("impressions_prev", 0)
+    impr_delta = impr_now - impr_prev
+    impr_decline_pct = (impr_delta / max(impr_prev, 1)) * 100 if impr_prev > 0 else 0
+
+    notes = []
+
+    # Rank position drop is the strongest signal
+    if pos_delta is not None and pos_delta >= 1.5:
+        notes.append(f"Position dropped {pos_delta:+.1f} positions; likely ranking loss or competitive displacement")
+        return "content_refresh", "content_usefulness_trust", notes
+
+    if pos_delta is not None and pos_delta >= 0.5:
+        notes.append(f"Position drifted {pos_delta:+.1f} positions; mild ranking regression")
+        return "content_refresh", "content_usefulness_trust", notes
+
+    # CTR drop with stable position → SERP displacement
+    if ctr_delta < -2.0 and impr_decline_pct > -30:
+        notes.append(f"CTR dropped {ctr_delta:+.1f}% while position held; likely SERP feature displacement")
+        return "snippet_content_packaging", "on_page_relevance_serp_packaging", notes
+
+    if ctr_delta < -1.0 and pos_delta is not None and abs(pos_delta) < 0.5:
+        notes.append(f"Mild CTR decline {ctr_delta:+.1f}% with stable position; possible SERP layout change")
+        return "snippet_content_packaging", "on_page_relevance_serp_packaging", notes
+
+    # Impression drop without position or CTR change → demand fade / intent shift
+    if impr_decline_pct < -40 and ctr_delta > -1.0 and (pos_delta is None or abs(pos_delta) < 0.5):
+        notes.append(f"Impressions declined {impr_decline_pct:.0f}% without ranking or CTR change; possible intent shift or demand fade")
+        return "query_intent_mapping", "demand_intent_targeting", notes
+
+    # Mixed signals — keep as page_improvement
+    notes.append("Mixed or ambiguous regression signals; operator investigation required")
+    return "page_improvement", "content_usefulness_trust", notes
+
+
 def decline_issue(page: dict[str, Any]) -> dict[str, Any]:
     raw_target = page.get("page")
     context = url_context(raw_target)
@@ -429,6 +486,31 @@ def decline_issue(page: dict[str, Any]) -> dict[str, Any]:
     action_type = "page_improvement"
     title_target = raw_target
     notes = []
+
+    # Decompose with top-losing-queries from query-page GSC data
+    top_losing_queries = page.get("top_losing_queries", [])
+    if top_losing_queries:
+        top_losing_queries = [q for q in top_losing_queries if q.get("absolute_click_loss", 0) > 0]
+
+    primary_query: str | None = None
+    if top_losing_queries:
+        top = top_losing_queries[0]
+        total_lost = top.get("absolute_click_loss", 0)
+        share_of_loss = total_lost / max(lost_clicks, 1)
+        top_name = top.get("query", "")
+
+        if share_of_loss >= 0.3:
+            # Dominant losing query — reclassify action type based on regression pattern
+            primary_query = top_name
+            classified_type, classified_area, classify_notes = classify_regression_pattern(top)
+            action_type = classified_type
+            notes.extend(classify_notes)
+            notes.append(f"Top query '{primary_query}' drives {share_of_loss:.0%} of lost clicks ({total_lost:g} of {lost_clicks:g})")
+        else:
+            # Distributed across queries — keep page_improvement but attach context
+            notes.append(f"Top query '{top_name}' drives {share_of_loss:.0%} of lost clicks; decline is distributed")
+            notes.append("Distributed decline; diagnose SERP changes and content freshness across multiple queries")
+
     if context["has_tracking_params"]:
         action_type = "canonical_or_tracking_investigation"
         actionability_score = 0.45
@@ -439,6 +521,25 @@ def decline_issue(page: dict[str, Any]) -> dict[str, Any]:
 
     url_quality = float(context["url_quality_score"])
     score = impact_score * confidence * actionability_score * url_quality
+
+    extra_kwargs: dict[str, Any] = {
+        "target": raw_target,
+        "base_priority": impact_score,
+        "expected_click_delta": round(-lost_clicks, 1),
+        "priority_score": round(score, 3),
+        "score_components": {
+            "expected_impact": round(impact_score, 3),
+            "confidence_score": confidence,
+            "goal_alignment_score": 1.0,
+            "actionability_score": actionability_score,
+            "url_quality_score": url_quality,
+        },
+        "operator_judgment_notes": notes,
+        "top_losing_queries": top_losing_queries,
+    }
+    if primary_query:
+        extra_kwargs["primary_query"] = primary_query
+
     return make_issue(
         f"Traffic dropped on {title_target}",
         severity_from_score(score),
@@ -448,18 +549,7 @@ def decline_issue(page: dict[str, Any]) -> dict[str, Any]:
             f"Current clicks: {clicks_now:g} | previous clicks: {clicks_prev:g} | lost clicks: {lost_clicks:g}",
         ],
         action_type,
-        target=raw_target,
-        base_priority=impact_score,
-        expected_click_delta=round(-lost_clicks, 1),
-        priority_score=round(score, 3),
-        score_components={
-            "expected_impact": round(impact_score, 3),
-            "confidence_score": confidence,
-            "goal_alignment_score": 1.0,
-            "actionability_score": actionability_score,
-            "url_quality_score": url_quality,
-        },
-        operator_judgment_notes=notes,
+        **extra_kwargs,
     )
 
 
@@ -650,7 +740,19 @@ def derive_candidate_issues(data: dict[str, Any]) -> list[dict[str, Any]]:
     declining_queries = comparison.get("declining_queries") or []
     brand_terms = data.get("_brand_terms") or []
 
-    issues.extend(decline_issue(page) for page in declining_pages[:8])
+    # Build lookup for query-page decompositions (from GSC comparison analysis)
+    page_query_lookup: dict[str, list[dict[str, Any]]] = {}
+    for decomp in (comparison.get("page_query_decompositions") or []):
+        page_url = decomp.get("page", "")
+        losing_queries = decomp.get("top_losing_queries", [])
+        if page_url and losing_queries:
+            page_query_lookup[page_url] = losing_queries
+
+    for page in declining_pages[:8]:
+        page_url = page.get("page", "")
+        top_losing = page_query_lookup.get(page_url, [])
+        page["top_losing_queries"] = top_losing
+        issues.extend([decline_issue(page)])
     issues.extend(ctr_gap_issue(gap, brand_terms) for gap in ctr_gaps[:8])
     issues.extend(cannibalization_issue(cannibal, brand_terms) for cannibal in cannibalization[:5])
     issues.extend(query_ctr_issue(opp, brand_terms) for opp in ctr_opps[:5])
@@ -1018,7 +1120,7 @@ def add_deep_dive_diagnostics(issues: list[dict[str, Any]], site_id: str, site_p
     enriched = []
     for issue in issues:
         updated = dict(issue)
-        if issue.get("recommended_action_type") in {"snippet_content_packaging", "meta_tags", "page_improvement", "query_intent_mapping", "local_intent_ownership"}:
+        if issue.get("recommended_action_type") in {"snippet_content_packaging", "meta_tags", "page_improvement", "query_intent_mapping", "local_intent_ownership", "content_refresh"}:
             updated["deep_dive"] = deep_dive_diagnostic(issue, site_id, site_profile, live=live)
         enriched.append(updated)
     return enriched
@@ -1364,6 +1466,8 @@ def build_payload(
                 "deep_dive": issue.get("deep_dive"),
                 "business_context_adjustment": issue.get("business_context_adjustment"),
                 "best_practice_alignment": issue.get("best_practice_alignment"),
+                "primary_query": issue.get("primary_query"),
+                "top_losing_queries": issue.get("top_losing_queries", []),
                 "consolidation_targets": issue.get("consolidation_targets"),
                 "source_target": issue.get("source_target"),
                 "needs_business_context": context_check["score"] < 0.75,
@@ -1394,6 +1498,8 @@ def build_payload(
                     "deep_dive": issue.get("deep_dive"),
                     "business_context_adjustment": issue.get("business_context_adjustment"),
                     "best_practice_alignment": issue.get("best_practice_alignment"),
+                    "primary_query": issue.get("primary_query"),
+                    "top_losing_queries": issue.get("top_losing_queries", []),
                     "consolidation_targets": issue.get("consolidation_targets"),
                     "source_target": issue.get("source_target"),
                     "business_context_score": context_check["score"],
@@ -1514,6 +1620,16 @@ def build_user_message(site_id: str, result: dict[str, Any], payload: dict[str, 
                 f"(SERP {'yes' if checks.get('serp_inspected') else 'no'}, "
                 f"snippet {'yes' if checks.get('current_snippet_inspected') else 'no'}, "
                 f"above-fold {'yes' if checks.get('above_the_fold_inspected') else 'no'})"
+            )
+        # Surface top-losing-query decomposition if available
+        top_losing = top_action.get("top_losing_queries", [])
+        if top_losing:
+            top_query = top_losing[0]
+            lines.append(
+                f"- Top losing query: `{top_query.get('query', '?')}` "
+                f"(lost {top_query.get('absolute_click_loss', 0):g} clicks, "
+                f"pos {top_query.get('position_prev', '?')}→{top_query.get('position_now', '?')}, "
+                f"CTR {top_query.get('ctr_prev', '?')}%→{top_query.get('ctr_now', '?')}%)"
             )
     if proposal_path:
         lines.extend(["", f"Proposal file: `{proposal_path}`"])

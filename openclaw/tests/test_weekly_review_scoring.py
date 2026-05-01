@@ -523,6 +523,166 @@ class WeeklyReviewScoringTest(unittest.TestCase):
                 self.assertEqual(alignment["primary_area"], area)
                 self.assertNotEqual(alignment["primary_area"], "unmapped")
 
+    def test_classify_ranking_loss_pattern(self) -> None:
+        """Position drop ≥1.5 → content_refresh, content_usefulness_trust."""
+        top_query = {
+            "query": "dog sitting seattle",
+            "position_now": 8.5,
+            "position_prev": 5.2,
+            "ctr_now": 3.0,
+            "ctr_prev": 5.0,
+            "impressions_now": 500,
+            "impressions_prev": 1200,
+        }
+        action_type, area, notes = weekly_review.classify_regression_pattern(top_query)
+        self.assertEqual(action_type, "content_refresh")
+        self.assertEqual(area, "content_usefulness_trust")
+        self.assertTrue(any("dropped" in n for n in notes))
+
+    def test_classify_serp_displacement_pattern(self) -> None:
+        """CTR drop with stable position → snippet_content_packaging."""
+        top_query = {
+            "query": "dog sitting seattle",
+            "position_now": 3.5,
+            "position_prev": 3.2,
+            "ctr_now": 2.0,
+            "ctr_prev": 6.0,
+            "impressions_now": 1200,
+            "impressions_prev": 1100,
+        }
+        action_type, area, notes = weekly_review.classify_regression_pattern(top_query)
+        self.assertEqual(action_type, "snippet_content_packaging")
+        self.assertEqual(area, "on_page_relevance_serp_packaging")
+        self.assertTrue(any("displacement" in n for n in notes))
+
+    def test_classify_demand_fade_pattern(self) -> None:
+        """Impression drop without position/CTR change → query_intent_mapping."""
+        top_query = {
+            "query": "dog sitting seattle",
+            "position_now": 4.5,
+            "position_prev": 4.2,
+            "ctr_now": 5.0,
+            "ctr_prev": 5.5,
+            "impressions_now": 200,
+            "impressions_prev": 800,
+        }
+        action_type, area, notes = weekly_review.classify_regression_pattern(top_query)
+        self.assertEqual(action_type, "query_intent_mapping")
+        self.assertEqual(area, "demand_intent_targeting")
+        self.assertTrue(any("intent" in n or "demand" in n for n in notes))
+
+    def test_classify_mixed_pattern(self) -> None:
+        """Small changes across metrics → page_improvement."""
+        top_query = {
+            "query": "dog sitting seattle",
+            "position_now": 4.5,
+            "position_prev": 4.3,
+            "ctr_now": 4.8,
+            "ctr_prev": 5.0,
+            "impressions_now": 800,
+            "impressions_prev": 850,
+        }
+        action_type, area, notes = weekly_review.classify_regression_pattern(top_query)
+        self.assertEqual(action_type, "page_improvement")
+        self.assertTrue(any("Mixed" in n for n in notes))
+
+    def test_classify_no_position_data(self) -> None:
+        """Missing position data → fall through to other signals."""
+        top_query = {
+            "query": "dog sitting",
+            "ctr_now": 2.0,
+            "ctr_prev": 6.0,
+            "impressions_now": 500,
+            "impressions_prev": 520,
+        }
+        action_type, area, notes = weekly_review.classify_regression_pattern(top_query)
+        self.assertEqual(action_type, "snippet_content_packaging")
+
+    def test_decline_issue_uses_top_losing_query_ranking_loss(self) -> None:
+        """decline_issue should set primary_query and reclassify to content_refresh when a top query shows ranking loss."""
+        page = {
+            "page": "https://example.com/dog-sitting-seattle",
+            "clicks_now": 50,
+            "clicks_prev": 100,
+            "change_pct": -50.0,
+            "top_losing_queries": [
+                {
+                    "query": "dog sitting seattle",
+                    "clicks_now": 30,
+                    "clicks_prev": 70,
+                    "absolute_click_loss": 40,
+                    "change_pct": -57.1,
+                    "position_now": 7.5,
+                    "position_prev": 4.0,
+                    "ctr_now": 3.0,
+                    "ctr_prev": 5.0,
+                    "impressions_now": 600,
+                    "impressions_prev": 1400,
+                }
+            ],
+        }
+        issue = weekly_review.decline_issue(page)
+        self.assertEqual(issue["primary_query"], "dog sitting seattle")
+        self.assertEqual(issue["recommended_action_type"], "content_refresh")
+        self.assertIn("top_losing_queries", issue)
+        self.assertEqual(len(issue["top_losing_queries"]), 1)
+
+    def test_decline_issue_uses_top_losing_query_serp_displacement(self) -> None:
+        """decline_issue should reclassify to snippet_content_packaging when CTR drops with stable position."""
+        page = {
+            "page": "https://example.com/dog-sitting-seattle",
+            "clicks_now": 60,
+            "clicks_prev": 100,
+            "change_pct": -40.0,
+            "top_losing_queries": [
+                {
+                    "query": "dog sitting seattle",
+                    "clicks_now": 35,
+                    "clicks_prev": 65,
+                    "absolute_click_loss": 30,
+                    "change_pct": -46.2,
+                    "position_now": 3.5,
+                    "position_prev": 3.2,
+                    "ctr_now": 2.0,
+                    "ctr_prev": 6.0,
+                    "impressions_now": 1200,
+                    "impressions_prev": 1100,
+                }
+            ],
+        }
+        issue = weekly_review.decline_issue(page)
+        self.assertEqual(issue["recommended_action_type"], "snippet_content_packaging")
+        self.assertEqual(issue["primary_query"], "dog sitting seattle")
+
+    def test_decline_issue_distributed_no_primary_query(self) -> None:
+        """When top query drives <30% of lost clicks, don't set primary_query or reclassify."""
+        page = {
+            "page": "https://example.com/dog-sitting-seattle",
+            "clicks_now": 80,
+            "clicks_prev": 100,
+            "change_pct": -20.0,
+            "top_losing_queries": [
+                {
+                    "query": "dog sitting seattle",
+                    "clicks_now": 45,
+                    "clicks_prev": 50,
+                    "absolute_click_loss": 5,
+                    "change_pct": -10.0,
+                    "position_now": 3.5,
+                    "position_prev": 3.2,
+                    "ctr_now": 4.0,
+                    "ctr_prev": 4.5,
+                    "impressions_now": 1100,
+                    "impressions_prev": 1150,
+                }
+            ],
+        }
+        issue = weekly_review.decline_issue(page)
+        # primary_query should be set (it's still the top query) but action_type stays page_improvement
+        # because share_of_loss = 5/20 = 25% < 30%
+        self.assertNotIn("primary_query", issue)
+        self.assertEqual(issue["recommended_action_type"], "page_improvement")
+
     def test_unknown_action_type_warns_as_unmapped(self) -> None:
         alignment = weekly_review.best_practice_alignment_for_issue({"recommended_action_type": "core_web_vitals"})
 

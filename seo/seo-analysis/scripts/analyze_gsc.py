@@ -254,11 +254,71 @@ def pull_period_comparison(token, site, days):
                 })
     query_changes.sort(key=lambda x: (-x.get("absolute_click_loss", 0), x["change_pct"]))
 
+    # --- Decompose each declining page into its top losing queries ---
+    # For each page that lost meaningful traffic, fetch its top queries from
+    # both periods so we can see which queries drove the decline.
+    page_query_decompositions = []
+    for pg in page_changes[:10]:
+        page_url = pg["page"]
+        # Fetch top queries for this page URL in both periods
+        def _page_queries(start, end):
+            body = {
+                "startDate": start.isoformat(), "endDate": end.isoformat(),
+                "dimensions": ["query"],
+                "dimensionFilterGroups": [{
+                    "filters": [{"dimension": "page", "operator": "equals", "expression": page_url}]
+                }],
+                "rowLimit": 25,
+                "orderBy": [{"fieldName": "clicks", "sortOrder": "DESCENDING"}]
+            }
+            data = gsc_query(token, site, body)
+            return {r["keys"][0]: r for r in data.get("rows", [])}
+
+        curr_page_q = _page_queries(start_curr, end_curr)
+        prev_page_q = _page_queries(start_prev, end_prev)
+
+        # Compute query-level deltas — only for queries present in BOTH periods
+        # to avoid inflating losses from truncated top-25 results.
+        page_losing_queries = []
+        shared_queries = set(curr_page_q.keys()) & set(prev_page_q.keys())
+        for q in shared_queries:
+            c = curr_page_q[q]
+            p = prev_page_q[q]
+            clicks_now = c.get("clicks", 0)
+            clicks_prev = p.get("clicks", 0)
+            click_delta = clicks_now - clicks_prev
+            if click_delta >= 0:
+                continue  # only losing queries matter
+            pct = round((click_delta / max(clicks_prev, 1)) * 100, 1)
+            page_losing_queries.append({
+                "query": q,
+                "clicks_now": clicks_now,
+                "clicks_prev": clicks_prev,
+                "click_delta": click_delta,
+                "absolute_click_loss": abs(click_delta),
+                "change_pct": pct,
+                "impressions_now": c.get("impressions", 0),
+                "impressions_prev": p.get("impressions", 0),
+                "impression_delta": c.get("impressions", 0) - p.get("impressions", 0),
+                "ctr_now": round(c.get("ctr", 0) * 100, 2) if c else 0,
+                "ctr_prev": round(p.get("ctr", 0) * 100, 2) if p else 0,
+                "position_now": round(c.get("position", 0), 1) if c else None,
+                "position_prev": round(p.get("position", 0), 1) if p else None,
+            })
+
+        page_losing_queries.sort(key=lambda x: -x["absolute_click_loss"])
+        if page_losing_queries:
+            page_query_decompositions.append({
+                "page": page_url,
+                "top_losing_queries": page_losing_queries[:10],
+            })
+
     return {
         "period": f"{start_curr.isoformat()} to {end_curr.isoformat()}",
         "prior_period": f"{start_prev.isoformat()} to {end_prev.isoformat()}",
         "declining_pages": page_changes[:20],
-        "declining_queries": query_changes[:20]
+        "declining_queries": query_changes[:20],
+        "page_query_decompositions": page_query_decompositions,
     }
 
 
