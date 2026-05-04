@@ -138,6 +138,25 @@ class WeeklyReviewScoringTest(unittest.TestCase):
         self.assertEqual(issue["score_components"]["goal_alignment_score"], 1.0)
         self.assertTrue(any("service page" in note for note in issue["operator_judgment_notes"]))
 
+    def test_generic_branded_gap_on_service_page_is_not_approval_ready(self) -> None:
+        issue = weekly_review.ctr_gap_issue(
+            {
+                "query": "example",
+                "page": "https://www.example.com/dog-boarding",
+                "clicks": 17,
+                "impressions": 941,
+                "ctr": 1.81,
+                "position": 1.2,
+            },
+            ["example"],
+        )
+        readiness = weekly_review.approval_readiness_for_issue(issue)
+
+        self.assertLess(issue["score_components"]["goal_alignment_score"], 1.0)
+        self.assertLess(issue["score_components"]["actionability_score"], 0.5)
+        self.assertFalse(readiness["approval_ready"])
+        self.assertTrue(any("generic branded" in note for note in issue["operator_judgment_notes"]))
+
     def test_branded_gap_on_blog_stays_lower_priority(self) -> None:
         issue = weekly_review.ctr_gap_issue(
             {
@@ -710,10 +729,50 @@ class WeeklyReviewScoringTest(unittest.TestCase):
             ],
         }
         issue = weekly_review.decline_issue(page)
-        # primary_query should be set (it's still the top query) but action_type stays page_improvement
-        # because share_of_loss = 5/20 = 25% < 30%
+        # share_of_loss = 5/20 = 25% < 30%, so the query is only a diagnostic fallback.
         self.assertNotIn("primary_query", issue)
+        self.assertEqual(issue["diagnostic_query"], "dog sitting seattle")
         self.assertEqual(issue["recommended_action_type"], "page_improvement")
+        self.assertLess(issue["score_components"]["actionability_score"], 0.5)
+        self.assertFalse(weekly_review.approval_readiness_for_issue(issue)["approval_ready"])
+
+    def test_non_actionable_top_issues_do_not_queue_approval_proposal(self) -> None:
+        analysis = self.base_analysis()
+        analysis["_brand_terms"] = ["example"]
+        analysis["comparison"]["declining_pages"] = [
+            {
+                "page": "https://www.example.com/blog/dog-boarding-cost",
+                "clicks_now": 173,
+                "clicks_prev": 247,
+                "change_pct": -30.0,
+            }
+        ]
+        analysis["comparison"]["page_query_decompositions"] = [
+            {
+                "page": "https://www.example.com/blog/dog-boarding-cost",
+                "top_losing_queries": [
+                    {"query": "average cost to board a dog", "absolute_click_loss": 1, "clicks_now": 2, "clicks_prev": 3}
+                ],
+            }
+        ]
+        analysis["ctr_gaps_by_page"] = [
+            {
+                "query": "example",
+                "page": "https://www.example.com/dog-boarding",
+                "clicks": 17,
+                "impressions": 941,
+                "ctr": 1.81,
+                "position": 1.2,
+            }
+        ]
+
+        payload = weekly_review.build_payload("example.com", analysis, {"priors": {}}, None)
+        proposals = [item for item in payload["queue_items"] if item["type"] == "action_proposal"]
+
+        self.assertEqual(proposals, [])
+        self.assertFalse(payload["action_plan"]["actions"][0]["approval_ready"])
+        quality_gate = next(item for item in payload["verification"]["checks"] if item["name"] == "recommendation quality gate")
+        self.assertEqual(quality_gate["status"], "warning")
 
     def test_unknown_action_type_warns_as_unmapped(self) -> None:
         alignment = weekly_review.best_practice_alignment_for_issue({"recommended_action_type": "core_web_vitals"})

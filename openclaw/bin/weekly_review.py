@@ -412,6 +412,32 @@ def is_branded_query(query: str | None, brand_terms: list[str] | None) -> bool:
     return any(term and term.lower() in q for term in brand_terms)
 
 
+GENERIC_BRAND_STOPWORDS = {"the", "a", "an", "inc", "llc", "ltd", "co", "company", "official", "website"}
+GENERIC_BRAND_SERVICE_TERMS = {"boarding", "board", "daycare", "grooming", "groom", "training", "sitting", "sitter", "pet", "dog", "cat"}
+
+
+def is_generic_branded_query(query: str | None, brand_terms: list[str] | None) -> bool:
+    """True for pure navigational brand searches like "paws vip".
+
+    Branded service searches ("paws vip dog boarding", "example grooming seattle")
+    can still be business-relevant for service pages, but pure brand navigational
+    searches usually belong to the homepage / GBP / directory SERP, so low CTR on
+    a secondary service page is not an actionable snippet opportunity.
+    """
+    if not is_branded_query(query, brand_terms):
+        return False
+    normalized = re.sub(r"[^a-z0-9]+", " ", (query or "").lower()).strip()
+    for term in sorted((brand_terms or []), key=len, reverse=True):
+        term_norm = re.sub(r"[^a-z0-9]+", " ", term.lower()).strip()
+        if term_norm:
+            normalized = re.sub(rf"\b{re.escape(term_norm)}\b", " ", normalized)
+    residual = " ".join(token for token in normalized.split() if token not in GENERIC_BRAND_STOPWORDS)
+    if not residual:
+        return True
+    action_terms = LOCAL_INTENT_TERMS | COMMERCIAL_SERVICE_TERMS | INFORMATIONAL_SERP_TERMS | GENERIC_BRAND_SERVICE_TERMS
+    return not any(term in residual for term in action_terms)
+
+
 SERVICE_PAGE_PATTERNS = re.compile(r"/(?:locations?|services?|pricing|booking|book|reserve|contact|about|faq|gallery|rates?|review|team|careers?|apply|shop|products?|dogs?-(?:boarding?|daycare|sitting?|grooming|training)|pet-(?:boarding?|daycare|sitting?|grooming|training))")
 
 
@@ -509,11 +535,23 @@ def decline_issue(page: dict[str, Any]) -> dict[str, Any]:
         top_losing_queries = [q for q in top_losing_queries if q.get("absolute_click_loss", 0) > 0]
 
     primary_query: str | None = None
+    diagnostic_query: str | None = None
+    query_decomposition: dict[str, Any] | None = None
+    approval_blockers: list[str] = []
     if top_losing_queries:
         top = top_losing_queries[0]
         total_lost = top.get("absolute_click_loss", 0)
         share_of_loss = total_lost / max(lost_clicks, 1)
         top_name = top.get("query", "")
+        diagnostic_query = top_name or None
+        explained_loss = sum(float(q.get("absolute_click_loss") or 0) for q in top_losing_queries[:5])
+        explained_loss_share = explained_loss / max(lost_clicks, 1)
+        query_decomposition = {
+            "top_query_loss_share": round(share_of_loss, 3),
+            "top_5_explained_loss_share": round(explained_loss_share, 3),
+            "top_5_explained_lost_clicks": round(explained_loss, 1),
+            "is_distributed": share_of_loss < 0.3,
+        }
 
         if share_of_loss >= 0.3:
             # Dominant losing query — reclassify action type based on regression pattern
@@ -526,6 +564,9 @@ def decline_issue(page: dict[str, Any]) -> dict[str, Any]:
             # Distributed across queries — keep page_improvement but attach context
             notes.append(f"Top query '{top_name}' drives {share_of_loss:.0%} of lost clicks; decline is distributed")
             notes.append("Distributed decline; diagnose SERP changes and content freshness across multiple queries")
+            actionability_score = 0.35 if explained_loss_share >= 0.5 else 0.2
+            notes.append("No dominant losing query; this is a diagnostic signal, not an approval-ready edit")
+            approval_blockers.append("distributed regression has no dominant primary query")
 
     if context["has_tracking_params"]:
         action_type = "canonical_or_tracking_investigation"
@@ -555,6 +596,12 @@ def decline_issue(page: dict[str, Any]) -> dict[str, Any]:
     }
     if primary_query:
         extra_kwargs["primary_query"] = primary_query
+    if diagnostic_query and diagnostic_query != primary_query:
+        extra_kwargs["diagnostic_query"] = diagnostic_query
+    if query_decomposition:
+        extra_kwargs["query_decomposition"] = query_decomposition
+    if approval_blockers:
+        extra_kwargs["approval_blockers"] = approval_blockers
 
     return make_issue(
         f"Traffic dropped on {title_target}",
@@ -593,9 +640,19 @@ def ctr_gap_issue(gap: dict[str, Any], brand_terms: list[str] | None = None) -> 
         ]
     url_quality = float(url_context(raw_target)["url_quality_score"])
     # For service pages, goal_alignment considers the page's role, not just the top
-    # underperforming query. A boarding page at position 1.2 with 943 impressions is
-    # inherently valuable — the branded query is just what's currently underperforming.
-    if is_service_page(raw_target) and is_branded_query(query, brand_terms):
+    # underperforming query. Branded service searches ("example boarding") can be
+    # valuable; pure brand navigational searches ("example") should not become
+    # secondary-page CTR edit proposals.
+    generic_branded_service_gap = is_service_page(raw_target) and is_generic_branded_query(query, brand_terms)
+    approval_blockers: list[str] = []
+    if generic_branded_service_gap:
+        goal_alignment_score = 0.35
+        actionability_score = min(actionability_score, 0.35)
+        goal_notes = [
+            "generic branded query; low CTR on a secondary service page is usually navigational SERP behavior, not a snippet/content fix",
+        ]
+        approval_blockers.append("generic branded query needs SERP ownership diagnosis, not a page edit")
+    elif is_service_page(raw_target) and is_branded_query(query, brand_terms):
         goal_alignment_score = 1.0
         goal_notes = ["service page; goal alignment based on page role, not gap query"]
     else:
@@ -627,9 +684,26 @@ def ctr_gap_issue(gap: dict[str, Any], brand_terms: list[str] | None = None) -> 
             "business_intent_score": business_intent_score,
             "actionability_score": actionability_score,
             "url_quality_score": url_quality,
+            **({"generic_brand_discount": 0.35} if generic_branded_service_gap else {}),
         },
         operator_judgment_notes=[*action_notes, *intent_notes, *goal_notes],
+        approval_blockers=approval_blockers,
     )
+
+
+def approval_readiness_for_issue(issue: dict[str, Any]) -> dict[str, Any]:
+    blockers = [str(blocker) for blocker in issue.get("approval_blockers", []) if blocker]
+    if issue.get("recommended_action_type") == "manual_review":
+        blockers.append("manual review only")
+    actionability = (issue.get("score_components") or {}).get("actionability_score")
+    if isinstance(actionability, (int, float)) and actionability < 0.5:
+        blockers.append("actionability below approval threshold")
+    if issue.get("recommended_action_type") == "page_improvement" and issue.get("diagnostic_query") and not issue.get("primary_query"):
+        blocker = "diagnostic query is only a fallback; no primary query owns the loss"
+        if blocker not in blockers:
+            blockers.append(blocker)
+    deduped = list(dict.fromkeys(blockers))
+    return {"approval_ready": not deduped, "approval_blockers": deduped}
 
 
 def cannibalization_issue(cannibal: dict[str, Any], brand_terms: list[str] | None = None) -> dict[str, Any]:
@@ -1095,7 +1169,8 @@ def matching_serp_result(serp: dict[str, Any], target: str | None) -> dict[str, 
 
 
 def deep_dive_diagnostic(issue: dict[str, Any], site_id: str, site_profile: dict[str, Any] | None = None, live: bool = False) -> dict[str, Any]:
-    query = issue.get("primary_query")
+    query = issue.get("primary_query") or issue.get("diagnostic_query")
+    query_source = "primary_query" if issue.get("primary_query") else ("diagnostic_query" if issue.get("diagnostic_query") else None)
     intent_class = issue.get("intent_class")
     target = issue.get("target") or issue.get("canonical_target") or issue.get("raw_target")
     if isinstance(target, str) and target.startswith("/"):
@@ -1123,6 +1198,7 @@ def deep_dive_diagnostic(issue: dict[str, Any], site_id: str, site_profile: dict
     return {
         "status": "completed" if all(checks.values()) else "partial",
         "query": query,
+        "query_source": query_source,
         "target": target,
         "checks": checks,
         "serp": serp,
@@ -1462,9 +1538,13 @@ def build_payload(
     context_request = build_business_context_request(site_id, context_check)
     if context_request:
         queue_items.append(context_request)
+    proposal_written = False
     for idx, issue in enumerate(top_issues, start=1):
         action_id = f"weekly_action_{idx:02d}"
         action_type = issue["recommended_action_type"]
+        readiness = approval_readiness_for_issue(issue)
+        issue["approval_ready"] = readiness["approval_ready"]
+        issue["approval_blockers"] = readiness["approval_blockers"]
         expected_delta = issue.get("expected_click_delta")
         expected_impact = issue.get("expected_impact") or f"Address {action_type.replace('_', ' ')} opportunity surfaced in the weekly review."
         if isinstance(expected_delta, (int, float)) and expected_delta > 0:
@@ -1490,14 +1570,19 @@ def build_payload(
                 "business_context_adjustment": issue.get("business_context_adjustment"),
                 "best_practice_alignment": issue.get("best_practice_alignment"),
                 "primary_query": issue.get("primary_query"),
+                "diagnostic_query": issue.get("diagnostic_query"),
+                "query_decomposition": issue.get("query_decomposition"),
                 "top_losing_queries": issue.get("top_losing_queries", []),
+                "approval_ready": issue.get("approval_ready", False),
+                "approval_blockers": issue.get("approval_blockers", []),
                 "consolidation_targets": issue.get("consolidation_targets"),
                 "source_target": issue.get("source_target"),
                 "needs_business_context": context_check["score"] < 0.75,
                 "learned_multiplier": issue.get("learned_multiplier", 1.0),
             }
         )
-        if idx == 1 and action_type != "manual_review":
+        if not proposal_written and issue.get("approval_ready") and action_type != "manual_review":
+            proposal_written = True
             queue_items.append(
                 {
                     "item_id": f"proposal_{site_id}_{action_type}_{analysis['period']['days']}d",
@@ -1522,7 +1607,11 @@ def build_payload(
                     "business_context_adjustment": issue.get("business_context_adjustment"),
                     "best_practice_alignment": issue.get("best_practice_alignment"),
                     "primary_query": issue.get("primary_query"),
+                    "diagnostic_query": issue.get("diagnostic_query"),
+                    "query_decomposition": issue.get("query_decomposition"),
                     "top_losing_queries": issue.get("top_losing_queries", []),
+                    "approval_ready": issue.get("approval_ready", False),
+                    "approval_blockers": issue.get("approval_blockers", []),
                     "consolidation_targets": issue.get("consolidation_targets"),
                     "source_target": issue.get("source_target"),
                     "business_context_score": context_check["score"],
@@ -1569,8 +1658,8 @@ def build_payload(
                 {"name": "action plan generated", "status": "pass", "notes": f"Primary metric for follow-up scoring: {primary_metric}."},
                 {
                     "name": "recommendation quality gate",
-                    "status": "pass" if top_issues[0].get("priority_score", 0) >= 0.35 else "warning",
-                    "notes": "; ".join(top_issues[0].get("operator_judgment_notes", [])) or "Top action has explicit score components for operator review.",
+                    "status": "pass" if top_issues[0].get("approval_ready") else "warning",
+                    "notes": "; ".join(top_issues[0].get("approval_blockers") or top_issues[0].get("operator_judgment_notes", [])) or "Top action has explicit score components for operator review.",
                 },
                 {
                     "name": "deep dive diagnostics",
@@ -1635,6 +1724,9 @@ def build_user_message(site_id: str, result: dict[str, Any], payload: dict[str, 
             f"- Best-practice lane: `{(top_action.get('best_practice_alignment') or {}).get('primary_area_label', 'not mapped')}`",
             f"- Requires approval: {'yes' if top_action.get('requires_approval') else 'no'}",
         ])
+        if top_action.get("approval_ready") is False:
+            blockers = top_action.get("approval_blockers") or []
+            lines.append(f"- Approval-ready: no{'; ' + '; '.join(blockers) if blockers else ''}")
         deep_dive = top_action.get("deep_dive") or {}
         checks = deep_dive.get("checks") or {}
         if deep_dive:
@@ -1656,6 +1748,8 @@ def build_user_message(site_id: str, result: dict[str, Any], payload: dict[str, 
             )
     if proposal_path:
         lines.extend(["", f"Proposal file: `{proposal_path}`"])
+    elif top_action:
+        lines.extend(["", "No approval proposal was queued; the review surfaced diagnostics only."])
     if context_request:
         questions = context_request.get("business_context_questions") or []
         score = context_request.get("business_context_score")
