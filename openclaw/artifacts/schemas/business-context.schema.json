@@ -1,0 +1,54 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Toprank OpenClaw Business Impact Context",
+  "type": "object",
+  "properties": {
+    "site_id": { "type": "string" },
+    "site_stage": {
+      "type": "string",
+      "enum": ["seed", "harvest", "defend", "recover"]
+    },
+    "service_value_weights": {
+      "description": "Relative revenue/margin weights by service, product, query theme, or page family. 1.0 = neutral; >1 = more valuable.",
+      "oneOf": [
+        { "type": "object", "additionalProperties": { "type": "number" } },
+        {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "term": { "type": "string" },
+              "service": { "type": "string" },
+              "product": { "type": "string" },
+              "weight": { "type": "number" }
+            },
+            "additionalProperties": true
+          }
+        }
+      ]
+    },
+    "target_customer_priority": {
+      "description": "Priority and deprioritized customer segments for qualified organic growth."
+    },
+    "location_priorities": {
+      "description": "Market/service-area priorities, capacity, and margin context."
+    },
+    "conversion_events": {
+      "description": "Organic conversion events or funnel signals with optional value weights and URL/query matches."
+    },
+    "booking_intent_hierarchy": {
+      "description": "Highest-priority vs supporting-only query intents."
+    },
+    "local_proof_points": {
+      "description": "Proof points snippets/content should emphasize."
+    },
+    "serp_competitor_positioning": {
+      "description": "Competitors/directories/SERP modules that affect priority queries."
+    },
+    "page_role_map": {
+      "description": "Mapping from URL/path to transactional, commercial, local, support, informational, or docs role."
+    }
+  },
+  "required": ["site_id"],
+  "additionalProperties": true
+}

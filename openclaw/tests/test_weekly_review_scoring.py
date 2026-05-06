@@ -530,6 +530,73 @@ class WeeklyReviewScoringTest(unittest.TestCase):
         self.assertTrue(any(gap["field"] == "service_value_weights" for gap in context_request["business_context_gaps"]))
         self.assertTrue(context_request["business_context_questions"])
 
+    def test_seed_stage_generates_demand_seed_action_instead_of_manual_review(self) -> None:
+        analysis = {
+            "site": "sc-domain:newco.com",
+            "period": {"start": "2026-04-01", "end": "2026-04-28", "days": 28},
+            "summary": {"clicks": 9, "impressions": 44, "ctr": 20.45, "position": 4.1},
+            "branded_split": {},
+            "comparison": {"declining_pages": [], "declining_queries": []},
+            "ctr_gaps_by_page": [],
+            "ctr_opportunities": [],
+            "cannibalization": [],
+            "top_pages": [{"page": "https://newco.com/setup-guide", "clicks": 0, "impressions": 6}],
+            "top_queries": [{"query": "newco setup", "clicks": 0, "impressions": 1}],
+        }
+
+        payload = weekly_review.build_payload("newco.com", analysis, {"priors": {}}, None, site_profile={"canonical_url": "https://newco.com"})
+        top_action = payload["action_plan"]["actions"][0]
+        proposal = next(item for item in payload["queue_items"] if item["type"] == "action_proposal")
+        stage_check = next(item for item in payload["verification"]["checks"] if item["name"] == "site stage playbook")
+
+        self.assertEqual(payload["action_plan"]["site_stage"]["stage"], "seed")
+        self.assertEqual(top_action["type"], "demand_seed_content")
+        self.assertNotEqual(top_action["type"], "manual_review")
+        self.assertEqual(top_action["approval_artifact_type"], "seed_content_portfolio_brief")
+        self.assertIn("Google Ads/search-term data", top_action["recommended_deliverable"]["demand_sources"])
+        self.assertEqual(proposal["action_type"], "demand_seed_content")
+        self.assertEqual(stage_check["site_stage"]["stage"], "seed")
+
+    def test_conversion_weighting_promotes_transactional_high_value_candidate(self) -> None:
+        analysis = self.base_analysis()
+        analysis["ctr_gaps_by_page"] = [
+            {
+                "query": "roof repair cost",
+                "page": "https://www.example.com/blog/roof-repair-cost",
+                "clicks": 2,
+                "impressions": 5000,
+                "ctr": 0.1,
+                "position": 3.0,
+            },
+            {
+                "query": "emergency roof repair near me",
+                "page": "https://www.example.com/roof-repair",
+                "clicks": 8,
+                "impressions": 900,
+                "ctr": 0.89,
+                "position": 8.0,
+            },
+        ]
+        business_context = {
+            "site_stage": "harvest",
+            "service_value_weights": {"emergency roof repair": 1.8, "roof repair cost": 0.6},
+            "conversion_events": [
+                {"name": "quote_request", "weight": 1.5, "paths": ["/roof-repair"], "intent_terms": ["near me", "emergency"]}
+            ],
+            "page_role_map": {
+                "/roof-repair": "transactional quote landing page",
+                "/blog/roof-repair-cost": "supporting informational page",
+            },
+        }
+
+        payload = weekly_review.build_payload("example.com", analysis, {"priors": {}}, None, business_context)
+        top_action = payload["action_plan"]["actions"][0]
+
+        self.assertEqual(top_action["target"], "https://www.example.com/roof-repair")
+        self.assertEqual(top_action["conversion_opportunity"]["matched_service"], "emergency roof repair")
+        self.assertEqual(top_action["conversion_opportunity"]["matched_conversion_event"], "quote_request")
+        self.assertGreater(top_action["priority_score"], top_action["raw_priority_score"])
+
     def test_action_proposal_includes_best_practice_alignment(self) -> None:
         analysis = self.base_analysis()
         analysis["ctr_gaps_by_page"] = [
@@ -556,6 +623,7 @@ class WeeklyReviewScoringTest(unittest.TestCase):
     def test_all_current_action_types_have_best_practice_mapping(self) -> None:
         expected_action_types = {
             "canonical_or_tracking_investigation",
+            "demand_seed_content",
             "query_intent_mapping",
             "local_intent_ownership",
             "content_refresh",
