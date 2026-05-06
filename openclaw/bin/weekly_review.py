@@ -252,12 +252,15 @@ def severity_from_score(score: float) -> str:
 
 def total_declining_click_loss(analysis: dict[str, Any]) -> float:
     comparison = analysis.get("comparison") or {}
-    loss = 0.0
+    page_loss = 0.0
+    query_loss = 0.0
     for page in comparison.get("declining_pages") or []:
-        loss += max(float(page.get("clicks_prev") or 0) - float(page.get("clicks_now") or 0), 0.0)
+        page_loss += max(float(page.get("clicks_prev") or 0) - float(page.get("clicks_now") or 0), 0.0)
     for query in comparison.get("declining_queries") or []:
-        loss += max(float(query.get("clicks_prev") or 0) - float(query.get("clicks_now") or 0), 0.0)
-    return round(loss, 1)
+        query_loss += max(float(query.get("clicks_prev") or 0) - float(query.get("clicks_now") or 0), 0.0)
+    # Page and query declines are different slices of the same GSC clicks. Summing
+    # them double-counts the same traffic loss and can falsely trigger recovery mode.
+    return round(max(page_loss, query_loss), 1)
 
 
 def infer_site_stage(analysis: dict[str, Any], metrics: dict[str, float], business_context: dict[str, Any] | None = None) -> dict[str, Any]:
@@ -1797,12 +1800,15 @@ def build_payload(
     candidates = dedupe_candidates(apply_business_context(derive_candidate_issues(analysis), business_context, site_id=site_id))
     candidates = apply_conversion_weighting(candidates, business_context, site_stage)
     ranked = apply_prioritization(candidates, learned, primary_metric)
-    if ranked:
+    if site_stage.get("stage") == "seed":
+        # Sparse-GSC sites need demand creation first. Keep noisy GSC-derived items as
+        # supporting diagnostics, but do not let a single low-volume CTR gap become
+        # the approval proposal ahead of the seed content portfolio.
+        seed_issue = seed_demand_issue(site_id, analysis, site_profile, business_context, site_stage)
+        seed_ranked = apply_prioritization(apply_conversion_weighting([seed_issue], business_context, site_stage), learned, primary_metric)
+        top_issues = [*seed_ranked, *ranked[:2]]
+    elif ranked:
         top_issues = ranked[:3]
-    elif site_stage.get("stage") == "seed":
-        top_issues = [seed_demand_issue(site_id, analysis, site_profile, business_context, site_stage)]
-        top_issues = apply_conversion_weighting(top_issues, business_context, site_stage)
-        top_issues = apply_prioritization(top_issues, learned, primary_metric)
     else:
         top_issues = [
             make_issue(

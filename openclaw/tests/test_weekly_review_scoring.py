@@ -557,6 +557,48 @@ class WeeklyReviewScoringTest(unittest.TestCase):
         self.assertEqual(proposal["action_type"], "demand_seed_content")
         self.assertEqual(stage_check["site_stage"]["stage"], "seed")
 
+    def test_seed_stage_prioritizes_seed_portfolio_over_sparse_ctr_noise(self) -> None:
+        analysis = {
+            "site": "sc-domain:newco.com",
+            "period": {"start": "2026-04-01", "end": "2026-04-28", "days": 28},
+            "summary": {"clicks": 20, "impressions": 900, "ctr": 2.2, "position": 4.0},
+            "branded_split": {},
+            "comparison": {"declining_pages": [], "declining_queries": []},
+            "ctr_gaps_by_page": [
+                {
+                    "query": "emergency roof repair near me",
+                    "page": "https://newco.com/roof-repair",
+                    "clicks": 1,
+                    "impressions": 900,
+                    "ctr": 0.11,
+                    "position": 3.0,
+                }
+            ],
+            "ctr_opportunities": [],
+            "cannibalization": [],
+            "top_pages": [],
+            "top_queries": [],
+        }
+
+        payload = weekly_review.build_payload("newco.com", analysis, {"priors": {}}, None, site_profile={"canonical_url": "https://newco.com"})
+        top_action = payload["action_plan"]["actions"][0]
+        proposal = next(item for item in payload["queue_items"] if item["type"] == "action_proposal")
+
+        self.assertEqual(payload["action_plan"]["site_stage"]["stage"], "seed")
+        self.assertEqual(top_action["type"], "demand_seed_content")
+        self.assertEqual(proposal["action_type"], "demand_seed_content")
+        self.assertTrue(any(action["type"] == "meta_tags" for action in payload["action_plan"]["actions"][1:]))
+
+    def test_declining_click_loss_uses_max_slice_not_page_plus_query_sum(self) -> None:
+        analysis = {
+            "comparison": {
+                "declining_pages": [{"clicks_prev": 100, "clicks_now": 80}],
+                "declining_queries": [{"clicks_prev": 95, "clicks_now": 75}],
+            }
+        }
+
+        self.assertEqual(weekly_review.total_declining_click_loss(analysis), 20.0)
+
     def test_conversion_weighting_promotes_transactional_high_value_candidate(self) -> None:
         analysis = self.base_analysis()
         analysis["ctr_gaps_by_page"] = [
