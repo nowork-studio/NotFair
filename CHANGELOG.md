@@ -9,6 +9,25 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+---
+
+## [0.18.0] — 2026-05-09
+
+### Changed
+- **Google Ads skills are now less prescriptive and more evidence-driven.** All four `/google-ads*` skills (`manage`, `audit`, `copy`, `landing`) have been rewritten to lean on the agent's diagnostic judgment instead of step-by-step decision trees. The skills now require every recommendation to cite specific data from the user's account — entity name, dollar amount, time window — and refuse to fall back on generic "industry typical" claims.
+- **New shared analysis principles.** Added `google-ads/shared/analysis-principles.md` covering the universal evidence requirement, the high-level approach, and the non-negotiable guardrails (STOP on broken conversion tracking, never pause Tier 1 keywords on short windows, statistical significance gate, server-side limits, undo window, bulk-write confirmation). Every Google Ads skill now reads this on entry alongside `preamble.md`.
+- **Audit no longer emits a 0–5 rubric score.** `/google-ads-audit` now produces three **pulse metrics** — Waste ($/mo), Demand captured (%), CPA ($) — each annotated with its top contributor and a pointer to the fix. The metric IS the verdict; no letter grades, no opaque numerical scores. The seven diagnostic areas remain as the surface area you look across to back the pulse metrics; the rigid scoring math is gone.
+- **Trimmed the most prescriptive references.** `manage/references/analysis-heuristics.md`, `manage/references/quality-score-framework.md`, and `audit/references/account-health-scoring.md` all drop the prescriptive "if condition X → action Y" threshold tables and keep the genuinely load-bearing material: signal-quality red flags, keyword tier classification (Tier 1 guardrail), statistical-significance gate, brand-leakage / weighted-QS / counting-type / Display+Search domain facts, the impression-share interpretive matrix, the wasted-spend formula with de-duplication, brand vs. non-brand framing, the pulse-metrics output spec, and industry CPA calibration anchors.
+
+### Added — tool-surface guidance for newer MCP capabilities
+- **Experiments framework** — `/google-ads-copy` now points A/B work at `createAdVariationExperiment` (and the broader `createExperiment` / `addExperimentArms` / `scheduleExperiment` / `graduateExperiment` / `promoteExperiment` flow) instead of the old "deploy two paused ads side by side" pattern.
+- **Change observability and interventions** — `/google-ads` surfaces `listChangeInterventions`, `getChangeIntervention`, `evaluateChangeIntervention`, `getChanges`, and `reviewChangeImpact` as first-class tools alongside `undoChange`.
+- **Shared negative keyword lists, portfolio bidding strategies, asset management (callout / sitelink / structured snippet / image — create + link + unlink), all campaign-creation types (PMax / Shopping / Video / Demand Gen / Display / App), PMax asset-group controls, offline conversion uploads (`uploadClickConversions`), tracking templates, server-side guardrails (`getGuardrails` / `setGuardrails`), and `summarizeAccountSetup`** are now categorically named in `manage/SKILL.md`'s tool-surface section so the agent knows the capabilities exist without enumerating every individual tool.
+
+---
+
+## [0.17.0]
+
 ### Added
 - **New skills: `/meta-ads` and `/meta-ads-audit`** — Meta Ads (Facebook + Instagram) operate / diagnose / audit skills. `/meta-ads` is the analytical brain layered on top of the NotFair-MetaAds MCP server: it covers performance and ROAS analysis, creative fatigue diagnosis, Learning Phase / Learning Limited triage, audience overlap and lookalike strategy, CBO/ABO/Advantage+ Shopping campaign structure, and the dedicated mutations the Meta MCP exposes (`pauseCampaign`/`pauseAdSet`/`pauseAd`, `enable*`, `updateCampaignBudget`, `updateAdSetBudget`, `renameCampaign`). `/meta-ads-audit` is the read-only health check — 7 dimensions scored 0–5 (Pixel + CAPI Health, Attribution & Measurement, Campaign Structure, Creative Health, Audience Strategy, Spend Efficiency, Scaling Readiness) — and persists `meta/business-context.json` + `meta/personas/{accountId}.json` for downstream skills. Skills follow the existing `google-ads/` template (`manage/`, `audit/`, `shared/`) and reuse the same `.notfair.json` config file via a new `metaAccountId` field. **Intentionally scoped:** `/meta-ads-copy` and `/meta-ads-landing` are not shipped in this release — Meta's creative-led, no-Quality-Score reality means those skills warrant Meta-native designs rather than literal mirrors of the Google Ads versions.
 - **MCP server: `NotFair-MetaAds`** — added to `.mcp.json` (`https://notfair.co/api/mcp/meta_ads`). Same OAuth 2.1 / native HTTP transport as `NotFair-GoogleAds`. Existing OAuth tokens for NotFair apply; restart Claude Code after upgrading to pick up the new server.

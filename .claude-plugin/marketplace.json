@@ -5,14 +5,14 @@
   },
   "metadata": {
     "description": "The official Google Ads + Meta Ads + SEO + GEO plugin from NotFair. SEO, GEO, Google Ads, and Meta Ads skills for Claude Code.",
-    "version": "0.17.0"
+    "version": "0.18.0"
   },
   "plugins": [
     {
       "name": "toprank",
       "source": "./",
       "description": "The official Google Ads + Meta Ads + SEO + GEO plugin from NotFair. SEO analysis, Google Ads management, Meta (Facebook + Instagram) Ads management, keyword research, content optimization, schema markup, meta tags optimization, broken link checker, single-page deep audit, and Generative Engine Optimization for AI search.",
-      "version": "0.17.0",
+      "version": "0.18.0",
       "author": {
         "name": "NotFair",
         "url": "https://notfair.co"

@@ -33,10 +33,10 @@ Headroom $          = (Break-Even CPA - Current CPA) × Monthly Conversions
 
 | Headroom | Framing | Action |
 |---|---|---|
-| Negative | "Losing $X/month on this campaign" | Pass 1 — pause or restructure immediately |
-| $0-$500/mo | "Barely break-even" | Pass 3 — improve QS/CVR before scaling |
-| $500-$2,000/mo | "Profitable but tight" | Pass 2 — selective scaling |
-| >$2,000/mo | "Strong unit economics" | Pass 2 — scale aggressively (20% rule) |
+| Negative | "Losing $X/month on this campaign" | Pause or restructure immediately |
+| $0-$500/mo | "Barely break-even" | Improve QS / CVR before scaling |
+| $500-$2,000/mo | "Profitable but tight" | Selective scaling |
+| >$2,000/mo | "Strong unit economics" | Scale aggressively (20% rule) |
 
 ---
 

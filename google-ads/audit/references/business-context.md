@@ -109,7 +109,7 @@ Unit economics drive margin-aware profitability framing (see `../../shared/ppc-m
 
 3. **Leave null (last resort):** If no industry template match and user declines to provide, leave all fields `null`. The audit falls back to account-average heuristics and skips break-even / headroom framing.
 
-**Never compute break-even CPA when `source == "inferred_from_template"` without surfacing the assumption.** A template-inferred margin that's off by 15% changes every Pass 1 dollar impact. Transparency is non-negotiable.
+**Never compute break-even CPA when `source == "inferred_from_template"` without surfacing the assumption.** A template-inferred margin that's off by 15% changes every dollar-impact figure in the audit. Transparency is non-negotiable.
 
 ### Industry template matching
 

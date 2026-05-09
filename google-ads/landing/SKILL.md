@@ -6,7 +6,7 @@ argument-hint: "<landing page URL or ad group name>"
 
 ## Setup
 
-Read and follow `../shared/preamble.md` — it handles MCP detection, token, and account selection. If config is already cached, this is instant.
+Read and follow `../shared/preamble.md` (MCP detection, account selection) and `../shared/analysis-principles.md` (evidence requirement, guardrails). Both apply throughout this skill — every dimension below is a measurement, not an opinion.
 
 # Landing Page Scoring + Diagnostic
 
