@@ -47,6 +47,12 @@
     },
     "page_role_map": {
       "description": "Mapping from URL/path to transactional, commercial, local, support, informational, or docs role."
+    },
+    "internal_link_sources": {
+      "description": "Known hub/category, adjacent commercial/service, and support/blog/docs pages that should link to priority SEO targets."
+    },
+    "retired_or_cannibal_pages": {
+      "description": "URLs that should be noindex, redirected, canonicalized, removed from sitemap, or removed from internal links."
     }
   },
   "required": ["site_id"],

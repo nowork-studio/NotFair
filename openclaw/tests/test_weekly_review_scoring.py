@@ -673,6 +673,8 @@ class WeeklyReviewScoringTest(unittest.TestCase):
             "meta_tags",
             "snippet_content_packaging",
             "internal_links",
+            "technical_index_sitemap",
+            "conversion_path_optimization",
             "manual_review",
         }
 
@@ -917,6 +919,189 @@ class WeeklyReviewScoringTest(unittest.TestCase):
         action = payload["action_plan"]["actions"][0]
         self.assertEqual(check["status"], "warning")
         self.assertEqual(action["best_practice_alignment"]["primary_area"], "unmapped")
+
+    def test_index_sitemap_consistency_creates_technical_issue(self) -> None:
+        analysis = self.base_analysis()
+        analysis["index_sitemap_consistency"] = {
+            "noindex_in_sitemap": [
+                {
+                    "url": "https://www.example.com/internal-thank-you",
+                    "canonical": "https://www.example.com/internal-thank-you",
+                }
+            ],
+            "internal_links_to_redirects": [
+                {
+                    "from": "https://www.example.com/old-roof-repair",
+                    "to": "https://www.example.com/roof-repair",
+                    "source_urls": ["https://www.example.com/services"],
+                }
+            ],
+        }
+
+        payload = weekly_review.build_payload(
+            "example.com",
+            analysis,
+            {"priors": {}},
+            None,
+            {
+                "site_stage": "harvest",
+                "service_value_weights": {"roof repair": 1.0},
+                "target_customer_priority": ["local homeowners"],
+                "location_priorities": {"Portland": {"priority": "high"}},
+                "conversion_events": [{"name": "quote_request", "paths": ["/roof-repair"]}],
+                "booking_intent_hierarchy": {"highest_priority": ["roof repair"]},
+                "local_proof_points": ["licensed team"],
+                "serp_competitor_positioning": {"roof repair": ["Angi"]},
+                "page_role_map": {"/roof-repair": "transactional quote landing page"},
+            },
+        )
+        top_action = payload["action_plan"]["actions"][0]
+        proposal = next(item for item in payload["queue_items"] if item["type"] == "action_proposal")
+        gate_check = next(item for item in payload["verification"]["checks"] if item["name"] == "SEO review gates")
+
+        self.assertEqual(top_action["type"], "technical_index_sitemap")
+        self.assertEqual(top_action["best_practice_alignment"]["primary_area"], "search_eligibility_indexability")
+        self.assertEqual(top_action["seo_review_gate_status"], "pass")
+        self.assertEqual(proposal["action_type"], "technical_index_sitemap")
+        self.assertEqual(gate_check["status"], "pass")
+
+    def test_cannibalization_gate_requires_explicit_page_roles(self) -> None:
+        analysis = self.base_analysis()
+        analysis["cannibalization"] = [
+            {
+                "query": "roof repair pricing",
+                "winner_page": "https://www.example.com/roof-repair",
+                "loser_pages": ["https://www.example.com/blog/roof-repair-cost"],
+                "competing_pages": [
+                    {"page": "https://www.example.com/roof-repair", "position": 4.0, "clicks": 8},
+                    {"page": "https://www.example.com/blog/roof-repair-cost", "position": 5.2, "clicks": 6},
+                ],
+                "total_impressions": 2500,
+                "total_clicks": 14,
+            }
+        ]
+
+        payload = weekly_review.build_payload(
+            "example.com",
+            analysis,
+            {"priors": {}},
+            None,
+            {
+                "site_stage": "harvest",
+                "service_value_weights": {"roof repair": 1.0},
+                "target_customer_priority": ["local homeowners"],
+                "location_priorities": {"Portland": {"priority": "high"}},
+                "conversion_events": [{"name": "quote_request", "paths": ["/roof-repair"]}],
+                "booking_intent_hierarchy": {"highest_priority": ["roof repair pricing"]},
+                "local_proof_points": ["licensed team"],
+                "serp_competitor_positioning": {"roof repair pricing": ["Angi"]},
+            },
+        )
+        action = payload["action_plan"]["actions"][0]
+        cannibal_gate = next(gate for gate in action["seo_review_gates"] if gate["name"] == "cannibalization intent safety")
+        no_ship_gate = next(gate for gate in action["seo_review_gates"] if gate["name"] == "Gemini NO-SHIP review")
+
+        self.assertEqual(action["type"], "internal_links")
+        self.assertEqual(cannibal_gate["status"], "warning")
+        self.assertEqual(no_ship_gate["status"], "warning")
+        self.assertEqual(action["seo_review_gate_status"], "warning")
+
+    def test_cannibalization_gate_passes_with_winner_and_support_roles(self) -> None:
+        analysis = self.base_analysis()
+        analysis["cannibalization"] = [
+            {
+                "query": "roof repair pricing",
+                "winner_page": "https://www.example.com/roof-repair",
+                "loser_pages": ["https://www.example.com/blog/roof-repair-cost"],
+                "total_impressions": 2500,
+                "total_clicks": 14,
+            }
+        ]
+        business_context = {
+            "site_stage": "harvest",
+            "service_value_weights": {"roof repair": 1.0},
+            "target_customer_priority": ["local homeowners"],
+            "location_priorities": {"Portland": {"priority": "high"}},
+            "conversion_events": [{"name": "quote_request", "paths": ["/roof-repair"]}],
+            "booking_intent_hierarchy": {"highest_priority": ["roof repair pricing"]},
+            "local_proof_points": ["licensed team"],
+            "serp_competitor_positioning": {"roof repair pricing": ["Angi"]},
+            "page_role_map": {
+                "/roof-repair": "transactional quote landing page",
+                "/blog/roof-repair-cost": "supporting informational page",
+            },
+        }
+
+        payload = weekly_review.build_payload("example.com", analysis, {"priors": {}}, None, business_context)
+        action = payload["action_plan"]["actions"][0]
+        cannibal_gate = next(gate for gate in action["seo_review_gates"] if gate["name"] == "cannibalization intent safety")
+
+        self.assertEqual(cannibal_gate["status"], "pass")
+        self.assertEqual(action["seo_review_gate_status"], "pass")
+        self.assertEqual(next(item for item in payload["queue_items"] if item["type"] == "action_proposal")["seo_review_gate_status"], "pass")
+
+    def test_content_depth_gate_flags_thin_page_before_approval_review(self) -> None:
+        analysis = self.base_analysis()
+        analysis["ctr_gaps_by_page"] = [
+            {
+                "query": "roof repair cost",
+                "page": "https://www.example.com/blog/roof-repair-cost",
+                "clicks": 2,
+                "impressions": 1681,
+                "ctr": 0.12,
+                "position": 2.8,
+            }
+        ]
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            source = root / "content" / "blogs"
+            source.mkdir(parents=True)
+            (source / "roof-repair-cost.mdx").write_text(
+                "---\n"
+                "title: \"Roof Repair Cost\"\n"
+                "description: \"Roof repair cost.\"\n"
+                "---\n\n"
+                "# Roof Repair Cost\n\n"
+                "Prices vary. Request quote.\n",
+                encoding="utf-8",
+            )
+            original = weekly_review.serp_snapshot_for_query
+            weekly_review.serp_snapshot_for_query = lambda query, site_id, live=False: {
+                "source": "test_serp",
+                "status": "ok",
+                "query": query,
+                "results": [{"title": "Roof Repair Cost", "domain": "example.com", "snippet": "$55-$90"}],
+                "answer_like_serp": True,
+            }
+            try:
+                payload = weekly_review.build_payload(
+                    "example.com",
+                    analysis,
+                    {"priors": {}},
+                    None,
+                    {
+                        "site_stage": "harvest",
+                        "service_value_weights": {"roof repair": 1.0},
+                        "target_customer_priority": ["local homeowners"],
+                        "location_priorities": {"Portland": {"priority": "high"}},
+                        "conversion_events": [{"name": "quote_request", "paths": ["/blog/roof-repair-cost"]}],
+                        "booking_intent_hierarchy": {"highest_priority": ["roof repair cost"]},
+                        "local_proof_points": ["licensed team"],
+                        "serp_competitor_positioning": {"roof repair cost": ["Angi"]},
+                        "page_role_map": {"/blog/roof-repair-cost": "supporting informational page"},
+                    },
+                    site_profile={"source_roots": [str(root)]},
+                    live_diagnostics=True,
+                )
+            finally:
+                weekly_review.serp_snapshot_for_query = original
+
+        action = payload["action_plan"]["actions"][0]
+        depth_gate = next(gate for gate in action["seo_review_gates"] if gate["name"] == "content depth")
+
+        self.assertEqual(depth_gate["status"], "warning")
+        self.assertLess(depth_gate["depth_score"]["score"], 0.7)
+        self.assertEqual(action["seo_review_gate_status"], "warning")
 
 
 if __name__ == "__main__":

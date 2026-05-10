@@ -38,5 +38,19 @@
     "/roof-repair": "transactional local landing page",
     "/roof-repair-prices": "local commercial-research page",
     "/blog/roof-repair-cost": "supporting informational page"
-  }
+  },
+  "internal_link_sources": {
+    "/roof-repair-prices": {
+      "hub_pages": ["/services"],
+      "adjacent_commercial_pages": ["/roof-repair"],
+      "support_pages": ["/blog/roof-repair-cost"]
+    }
+  },
+  "retired_or_cannibal_pages": [
+    {
+      "url": "/old-roof-repair-pricing",
+      "desired_state": "redirected and absent from sitemap/internal links",
+      "canonical_owner": "/roof-repair-prices"
+    }
+  ]
 }

@@ -113,6 +113,8 @@ ACTION_BEST_PRACTICE_AREAS = {
     "meta_tags": "on_page_relevance_serp_packaging",
     "snippet_content_packaging": "on_page_relevance_serp_packaging",
     "internal_links": "authority_distribution",
+    "technical_index_sitemap": "search_eligibility_indexability",
+    "conversion_path_optimization": "measurement_prioritization_experimentation",
     "manual_review": "measurement_prioritization_experimentation",
 }
 
@@ -365,6 +367,10 @@ def best_practice_alignment_for_issue(issue: dict[str, Any]) -> dict[str, Any]:
         notes.append("Use relevant internal links to clarify page ownership and distribute authority; do not jump straight to redirects.")
     elif action_type == "canonical_or_tracking_investigation":
         notes.append("Canonical/tracking variants should be investigated as URL hygiene before editing page copy.")
+    elif action_type == "technical_index_sitemap":
+        notes.append("Resolve noindex, sitemap, redirect, canonical, and internal-link inconsistencies before asking content changes to perform.")
+    elif action_type == "conversion_path_optimization":
+        notes.append("Organic traffic should route to a measurable qualified action; check CTA friction and conversion instrumentation before chasing clicks.")
 
     return {
         "reference": SEO_BEST_PRACTICE_REFERENCE,
@@ -787,6 +793,10 @@ def cannibalization_issue(cannibal: dict[str, Any], brand_terms: list[str] | Non
         base_priority=impact_score,
         expected_click_delta=None,
         priority_score=round(score, 3),
+        winner_page=raw_target,
+        loser_pages=loser_pages,
+        competing_pages=cannibal.get("competing_pages", []),
+        source_recommended_action=cannibal.get("recommended_action"),
         score_components={
             "expected_impact": round(impact_score, 3),
             "confidence_score": confidence,
@@ -795,6 +805,96 @@ def cannibalization_issue(cannibal: dict[str, Any], brand_terms: list[str] | Non
             "url_quality_score": url_quality,
         },
         operator_judgment_notes=["needs intent review before redirects/canonicals", *goal_notes],
+    )
+
+
+def technical_consistency_findings(data: dict[str, Any]) -> list[dict[str, Any]]:
+    """Extract index/sitemap/canonical/link findings from analyzer or crawler output.
+
+    Toprank does not assume one crawler schema. Site-specific analyzers can pass a
+    compact `index_sitemap_consistency` block, or nest the same block under
+    `technical_seo` / `technical_audit`.
+    """
+    sources = [
+        data.get("index_sitemap_consistency"),
+        (data.get("technical_seo") or {}).get("index_sitemap_consistency") if isinstance(data.get("technical_seo"), dict) else None,
+        (data.get("technical_audit") or {}).get("index_sitemap_consistency") if isinstance(data.get("technical_audit"), dict) else None,
+    ]
+    field_labels = {
+        "noindex_in_sitemap": "noindex URL is present in sitemap",
+        "noindex_urls_in_sitemap": "noindex URL is present in sitemap",
+        "redirect_in_sitemap": "redirecting URL is present in sitemap",
+        "redirects_in_sitemap": "redirecting URL is present in sitemap",
+        "internal_links_to_redirects": "internal links still point at redirected URLs",
+        "internal_links_to_noindex": "internal links point at noindex URLs",
+        "canonical_mismatches": "canonical target does not match the URL being promoted",
+    }
+    findings: list[dict[str, Any]] = []
+    for source in sources:
+        if not isinstance(source, dict):
+            continue
+        for field, label in field_labels.items():
+            values = source.get(field) or []
+            if isinstance(values, dict):
+                values = [values]
+            if isinstance(values, str):
+                values = [{"url": values}]
+            for item in values:
+                if isinstance(item, str):
+                    item = {"url": item}
+                if not isinstance(item, dict):
+                    continue
+                url = item.get("url") or item.get("page") or item.get("source_url") or item.get("from")
+                if not url:
+                    continue
+                findings.append({
+                    "type": field,
+                    "label": label,
+                    "url": url,
+                    "canonical_url": item.get("canonical_url") or item.get("canonical") or item.get("target"),
+                    "redirect_target": item.get("redirect_target") or item.get("to") or item.get("destination"),
+                    "source_urls": item.get("source_urls") or item.get("linked_from") or item.get("referrers") or [],
+                    "raw": item,
+                })
+    return findings
+
+
+def technical_consistency_issue(finding: dict[str, Any]) -> dict[str, Any]:
+    target = finding.get("url")
+    label = finding.get("label", "technical consistency issue")
+    source_urls = finding.get("source_urls") or []
+    if isinstance(source_urls, str):
+        source_urls = [source_urls]
+    evidence = [label, f"URL: {target}"]
+    if finding.get("canonical_url"):
+        evidence.append(f"Canonical target: {finding['canonical_url']}")
+    if finding.get("redirect_target"):
+        evidence.append(f"Redirect target: {finding['redirect_target']}")
+    if source_urls:
+        evidence.append(f"Linked from: {', '.join(str(url) for url in source_urls[:5])}")
+    return make_issue(
+        f"Fix index/sitemap consistency: {target}",
+        "warning",
+        0.8,
+        evidence,
+        "technical_index_sitemap",
+        target=target,
+        base_priority=0.9,
+        expected_click_delta=None,
+        priority_score=0.72,
+        technical_consistency_finding=finding,
+        score_components={
+            "expected_impact": 0.9,
+            "confidence_score": 0.8,
+            "goal_alignment_score": 1.0,
+            "actionability_score": 0.95,
+            "url_quality_score": float(url_context(target)["url_quality_score"]),
+        },
+        operator_judgment_notes=[
+            "noindex URLs must be absent from sitemaps",
+            "redirected URLs should be removed from sitemaps and internal links should point to canonical destinations",
+            "fix eligibility/indexing hygiene before content or metadata edits",
+        ],
     )
 
 
@@ -906,6 +1006,7 @@ def derive_candidate_issues(data: dict[str, Any]) -> list[dict[str, Any]]:
         top_losing = page_query_lookup.get(page_url, [])
         page["top_losing_queries"] = top_losing
         issues.extend([decline_issue(page)])
+    issues.extend(technical_consistency_issue(finding) for finding in technical_consistency_findings(data)[:8])
     issues.extend(ctr_gap_issue(gap, brand_terms) for gap in ctr_gaps[:8])
     issues.extend(cannibalization_issue(cannibal, brand_terms) for cannibal in cannibalization[:5])
     issues.extend(query_ctr_issue(opp, brand_terms) for opp in ctr_opps[:5])
@@ -1042,6 +1143,7 @@ def parse_html_snapshot(raw_html: str, source: str) -> dict[str, Any]:
         "meta_description": html.unescape(parser.meta_description).strip(),
         "h1": html.unescape(parser.h1).strip(),
         "above_the_fold_text": body[:1800],
+        "content_word_count": len(re.findall(r"\b\w+\b", body)),
         "cta_texts": sorted({text.strip() for text in parser.cta_texts if text.strip()})[:12],
     }
 
@@ -1079,6 +1181,7 @@ def parse_frontmatter_snapshot(markdown: str, source_path: Path) -> dict[str, An
         "meta_description": frontmatter.get("description", ""),
         "h1": heading or frontmatter.get("title", ""),
         "above_the_fold_text": plain[:1800],
+        "content_word_count": len(re.findall(r"\b\w+\b", plain)),
         "cta_texts": sorted(set(re.findall(r"(?i)\b(book now|book|reserve|call|schedule|request quote|get quote)\b", plain[:2500])))[:12],
     }
 
@@ -1244,6 +1347,7 @@ def deep_dive_diagnostic(issue: dict[str, Any], site_id: str, site_profile: dict
             "h1": None,
         }
     packaging = analyze_page_packaging(page_snapshot, query)
+    depth = content_depth_score(page_snapshot, issue)
     zero_click_risk, zero_click_notes = zero_click_risk_for_query(query, intent_class)
     checks = {
         "serp_inspected": serp.get("status") == "ok" and bool(serp.get("results")),
@@ -1267,6 +1371,7 @@ def deep_dive_diagnostic(issue: dict[str, Any], site_id: str, site_profile: dict
             "h1": snippet_snapshot.get("h1"),
         },
         "above_the_fold": packaging,
+        "content_depth": depth,
         "zero_click_risk": {"level": zero_click_risk, "notes": zero_click_notes},
     }
 
@@ -1277,6 +1382,224 @@ def add_deep_dive_diagnostics(issues: list[dict[str, Any]], site_id: str, site_p
         updated = dict(issue)
         if issue.get("recommended_action_type") in {"snippet_content_packaging", "meta_tags", "page_improvement", "query_intent_mapping", "local_intent_ownership", "content_refresh"}:
             updated["deep_dive"] = deep_dive_diagnostic(issue, site_id, site_profile, live=live)
+        enriched.append(updated)
+    return enriched
+
+
+def gate_result(name: str, status: str, notes: list[str] | str, **extra: Any) -> dict[str, Any]:
+    return {
+        "name": name,
+        "status": status,
+        "notes": notes if isinstance(notes, list) else [notes],
+        **extra,
+    }
+
+
+def gate_rollup(gates: list[dict[str, Any]]) -> str:
+    statuses = {gate.get("status") for gate in gates}
+    if "blocked" in statuses:
+        return "blocked"
+    if "warning" in statuses:
+        return "warning"
+    return "pass"
+
+
+def content_depth_score(page_snapshot: dict[str, Any], issue: dict[str, Any]) -> dict[str, Any]:
+    text = (page_snapshot.get("above_the_fold_text") or "").lower()
+    action_type = issue.get("recommended_action_type")
+    word_count = int(page_snapshot.get("content_word_count") or 0)
+    required_words = 700 if action_type in {"content_refresh", "page_improvement", "snippet_content_packaging"} else 300
+    markers = {
+        "use_cases": bool(re.search(r"\b(use case|for teams|for agencies|for owners|scenario|when to)\b", text)),
+        "workflows": bool(re.search(r"\b(workflow|process|steps|how it works|approval|setup)\b", text)),
+        "examples": bool(re.search(r"\b(example|sample|template|case study)\b", text)),
+        "faqs": bool(re.search(r"\b(faq|questions?|asked)\b", text)),
+        "differentiation": bool(re.search(r"\b(why us|different|unlike|advantage|proof|reviews?|licensed|certified|integrat)\b", text)),
+    }
+    marker_hits = sum(1 for present in markers.values() if present)
+    score = round(clamp((word_count / max(required_words, 1)) * 0.55 + (marker_hits / len(markers)) * 0.45, 0.0, 1.0), 3)
+    return {
+        "score": score,
+        "word_count": word_count,
+        "required_words": required_words,
+        "markers": markers,
+        "marker_hits": marker_hits,
+    }
+
+
+def cannibalization_gate(issue: dict[str, Any], business_context: dict[str, Any] | None) -> dict[str, Any]:
+    if issue.get("recommended_action_type") not in {"internal_links", "local_intent_ownership"} and not issue.get("loser_pages"):
+        return gate_result("cannibalization intent safety", "pass", "No competing-page signal on this action.")
+    winner = issue.get("winner_page") or issue.get("target") or issue.get("canonical_target")
+    loser_pages = [str(page) for page in issue.get("loser_pages") or []]
+    page_roles = (business_context or {}).get("page_role_map") or {}
+    winner_role = matching_page_role(winner, page_roles)
+    loser_roles = {page: matching_page_role(page, page_roles) for page in loser_pages}
+    supporting_losers = [page for page, role in loser_roles.items() if any(token in role for token in ["support", "informational", "noindex", "redirect", "canonical"])]
+    if loser_pages and not winner_role:
+        return gate_result(
+            "cannibalization intent safety",
+            "warning",
+            "Competing pages exist; declare the canonical/intended owner and loser roles before redirect/canonical/internal-link changes.",
+            winner_page=winner,
+            loser_pages=loser_pages,
+            loser_roles=loser_roles,
+        )
+    if loser_pages and len(supporting_losers) < len(loser_pages):
+        return gate_result(
+            "cannibalization intent safety",
+            "warning",
+            "Some competing pages are not marked as supporting/noindex/redirect/canonical; avoid consolidating until page roles are explicit.",
+            winner_page=winner,
+            winner_role=winner_role,
+            loser_roles=loser_roles,
+        )
+    return gate_result(
+        "cannibalization intent safety",
+        "pass",
+        "Canonical owner and supporting/retired competitors are explicit enough for approval review.",
+        winner_page=winner,
+        winner_role=winner_role,
+        loser_roles=loser_roles,
+    )
+
+
+def internal_link_graph_gate(issue: dict[str, Any], business_context: dict[str, Any] | None) -> dict[str, Any]:
+    if issue.get("recommended_action_type") not in {"internal_links", "local_intent_ownership", "demand_seed_content", "content_refresh", "page_improvement", "snippet_content_packaging"}:
+        return gate_result("internal link graph", "pass", "No internal-link plan required for this action type.")
+    target = issue.get("target") or issue.get("canonical_target")
+    source_target = issue.get("source_target")
+    requirements = [
+        "links from hub/category pages",
+        "links from adjacent commercial/service pages",
+        "links from relevant support/blog/docs pages",
+        "remove links pointing to retired, redirected, noindex, or cannibal pages",
+    ]
+    if source_target:
+        requirements.append("source support page links clearly to the preferred owner")
+    context_has_roles = bool(page_role_entries(business_context))
+    context_has_link_sources = bool((business_context or {}).get("internal_link_sources"))
+    status = "pass" if issue.get("internal_link_plan") or context_has_link_sources or context_has_roles else "warning"
+    notes = "Internal-link requirements are explicit; use them when drafting the approved patch." if status == "pass" else "No page-role map/internal-link plan is attached; approval should require link sources before publishing."
+    return gate_result(
+        "internal link graph",
+        status,
+        notes,
+        target=target,
+        source_target=source_target,
+        required_links=requirements,
+        configured_link_sources=(business_context or {}).get("internal_link_sources"),
+        retired_or_cannibal_pages=(business_context or {}).get("retired_or_cannibal_pages"),
+    )
+
+
+def content_depth_gate(issue: dict[str, Any]) -> dict[str, Any]:
+    action_type = issue.get("recommended_action_type")
+    if action_type not in {"demand_seed_content", "content_refresh", "page_improvement", "snippet_content_packaging"}:
+        return gate_result("content depth", "pass", "No content-depth gate required for this action type.")
+    if action_type == "demand_seed_content":
+        deliverable = issue.get("recommended_deliverable") or {}
+        required = deliverable.get("required_fields_per_bet") or []
+        status = "pass" if {"slug", "target_query_cluster", "intent", "conversion_event", "CTA", "measurement_plan"}.issubset(set(required)) else "warning"
+        return gate_result(
+            "content depth",
+            status,
+            "Seed content brief requires concrete use cases, intent, CTA, and measurement fields before new pages are approved.",
+            required_fields_per_bet=required,
+        )
+    depth = (issue.get("deep_dive") or {}).get("content_depth")
+    if not depth:
+        depth = {
+            "score": 0.0,
+            "word_count": 0,
+            "required_words": 700,
+            "markers": {},
+            "marker_hits": 0,
+        }
+    status = "pass" if depth["score"] >= 0.7 else "warning"
+    return gate_result(
+        "content depth",
+        status,
+        "Content is deep enough for approval review." if status == "pass" else "Do not ship thin SEO copy; add workflows, examples, FAQs, and differentiating proof before publishing.",
+        depth_score=depth,
+    )
+
+
+def conversion_path_gate(issue: dict[str, Any], business_context: dict[str, Any] | None) -> dict[str, Any]:
+    action_type = issue.get("recommended_action_type")
+    if action_type == "technical_index_sitemap":
+        return gate_result("conversion path", "pass", "Technical hygiene action does not need a conversion-path rewrite.")
+    conversion = issue.get("conversion_opportunity") or {}
+    context_events = context_values((business_context or {}).get("conversion_events"))
+    deep_dive = issue.get("deep_dive") or {}
+    cta_seen = ((deep_dive.get("above_the_fold") or {}).get("has_booking_cta_above_fold") is True)
+    if conversion.get("matched_conversion_event") or cta_seen:
+        return gate_result("conversion path", "pass", "Action has either a mapped conversion event or an above-the-fold CTA.", conversion_opportunity=conversion)
+    notes = "Conversion events exist, but this action is not mapped to one yet." if context_events else "Business context is missing conversion events; approval should keep `complete_business_context` as a precondition."
+    return gate_result("conversion path", "warning", notes, conversion_opportunity=conversion)
+
+
+def technical_index_gate(issue: dict[str, Any]) -> dict[str, Any]:
+    finding = issue.get("technical_consistency_finding")
+    if finding:
+        return gate_result(
+            "index/sitemap consistency",
+            "blocked" if issue.get("recommended_action_type") != "technical_index_sitemap" else "pass",
+            "Noindex/sitemap/redirect/internal-link inconsistency is explicit and actionable.",
+            finding=finding,
+        )
+    return gate_result("index/sitemap consistency", "pass", "No sitemap/indexing conflict attached to this action.")
+
+
+def no_ship_review_gate(issue: dict[str, Any], prior_gates: list[dict[str, Any]]) -> dict[str, Any]:
+    notes = []
+    if any(gate.get("status") == "blocked" for gate in prior_gates):
+        notes.append("blocked prerequisite gate exists")
+    if cannibalization := next((gate for gate in prior_gates if gate.get("name") == "cannibalization intent safety"), None):
+        if cannibalization.get("status") == "warning":
+            notes.append("cannibalization ownership is not explicit")
+    conversion = next((gate for gate in prior_gates if gate.get("name") == "conversion path"), None)
+    if conversion and conversion.get("status") != "pass":
+        notes.append("conversion path is weak or unmapped")
+    public_text = json.dumps({
+        "title": issue.get("title"),
+        "notes": issue.get("operator_judgment_notes"),
+        "deliverable": issue.get("recommended_deliverable"),
+    }, default=str).lower()
+    if re.search(r"\b(secret|private strategy|internal-only|do not disclose|confidential)\b", public_text):
+        notes.append("possible public strategy/confidentiality leakage in proposed copy/brief")
+    status = "blocked" if any("blocked prerequisite" in note or "confidentiality" in note for note in notes) else ("warning" if notes else "pass")
+    return gate_result(
+        "Gemini NO-SHIP review",
+        status,
+        notes or "NO-SHIP checks passed: no public strategy leakage, unresolved cannibalization blocker, CTA friction blocker, or technical SEO conflict detected.",
+        template_checks=[
+            "public strategy leakage",
+            "cannibalization/intent ownership",
+            "CTA and conversion friction",
+            "index/sitemap/canonical/internal-link consistency",
+        ],
+    )
+
+
+def add_seo_review_gates(issues: list[dict[str, Any]], business_context: dict[str, Any] | None = None) -> list[dict[str, Any]]:
+    enriched = []
+    for issue in issues:
+        updated = dict(issue)
+        gates = [
+            technical_index_gate(updated),
+            cannibalization_gate(updated, business_context),
+            internal_link_graph_gate(updated, business_context),
+            content_depth_gate(updated),
+            conversion_path_gate(updated, business_context),
+        ]
+        gates.append(no_ship_review_gate(updated, gates))
+        updated["seo_review_gates"] = gates
+        updated["seo_review_gate_status"] = gate_rollup(gates)
+        if updated["seo_review_gate_status"] == "blocked":
+            blockers = list(updated.get("approval_blockers") or [])
+            blockers.append("SEO review gates blocked approval")
+            updated["approval_blockers"] = list(dict.fromkeys(blockers))
         enriched.append(updated)
     return enriched
 
@@ -1830,6 +2153,7 @@ def build_payload(
         for issue in top_issues
     ]
     top_issues = add_deep_dive_diagnostics(top_issues, site_id, site_profile, live=live_diagnostics)
+    top_issues = add_seo_review_gates(top_issues, business_context)
 
     summary = analysis.get("summary") or {}
     non_brand_clicks = metrics.get(primary_metric)
@@ -1872,6 +2196,8 @@ def build_payload(
                 "raw_priority_score": issue.get("raw_priority_score"),
                 "site_stage": site_stage,
                 "best_practice_alignment": issue.get("best_practice_alignment"),
+                "seo_review_gates": issue.get("seo_review_gates", []),
+                "seo_review_gate_status": issue.get("seo_review_gate_status"),
                 "primary_query": issue.get("primary_query"),
                 "diagnostic_query": issue.get("diagnostic_query"),
                 "query_decomposition": issue.get("query_decomposition"),
@@ -1914,6 +2240,8 @@ def build_payload(
                     "raw_priority_score": issue.get("raw_priority_score"),
                     "site_stage": site_stage,
                     "best_practice_alignment": issue.get("best_practice_alignment"),
+                    "seo_review_gates": issue.get("seo_review_gates", []),
+                    "seo_review_gate_status": issue.get("seo_review_gate_status"),
                     "primary_query": issue.get("primary_query"),
                     "diagnostic_query": issue.get("diagnostic_query"),
                     "query_decomposition": issue.get("query_decomposition"),
@@ -1988,6 +2316,12 @@ def build_payload(
                     "notes": top_issues[0].get("best_practice_alignment", {}).get("primary_area_label", "Top recommendation is not mapped to a MECE SEO best-practice lane."),
                     "reference": SEO_BEST_PRACTICE_REFERENCE,
                     "alignment": top_issues[0].get("best_practice_alignment", {}),
+                },
+                {
+                    "name": "SEO review gates",
+                    "status": "pass" if top_issues[0].get("seo_review_gate_status") == "pass" else "warning",
+                    "notes": f"Gate rollup: {top_issues[0].get('seo_review_gate_status') or 'unknown'}.",
+                    "gates": top_issues[0].get("seo_review_gates", []),
                 },
                 {
                     "name": "business impact context",

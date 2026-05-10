@@ -21,6 +21,8 @@ Each recommendation should expose the inputs that drove ranking:
 - `url_quality_score` — whether the URL is canonical/actionable or a tracking/parameter variant
 - `learned_multiplier` — site-local prior from previous outcomes
 - `best_practice_alignment` — the primary SEO best-practice lane, source references, and why the action belongs there
+- `seo_review_gates` — explicit pre-approval checks for index/sitemap consistency, cannibalization ownership, internal-link graph, content depth, conversion path, and NO-SHIP risks
+- `seo_review_gate_status` — rollup status for those gates: `pass`, `warning`, or `blocked`
 
 These are not hard approval rules. They are decision levers for the operator and the human reviewer.
 
@@ -30,6 +32,9 @@ These are not hard approval rules. They are decision levers for the operator and
 - Tracking URLs and UTM variants treated as standalone strategic pages
 - Branded/navigational query noise outranking non-brand growth opportunities
 - Cannibalization reports where the “winner” is not actually the intended page
+- Cannibalization fixes that redirect/canonicalize pages before declaring the canonical owner and support/retired page roles
+- Noindex pages left in XML sitemaps, redirected URLs left in sitemaps, or internal links still pointing to retired URLs
+- Thin SEO pages that have a query target but no real workflows, examples, FAQs, differentiating proof, or conversion path
 - Query-level opportunities that have not been mapped to a concrete page
 - Treating high-impression informational/price queries as metadata-only wins without checking zero-click SERP behavior
 
@@ -43,6 +48,13 @@ These are not hard approval rules. They are decision levers for the operator and
 - Explain why the top action is actionable and what would make it unsafe or low-confidence.
 - Attach `best_practice_alignment` to proposals and action-plan entries. If an action cannot be mapped to one primary best-practice lane, downgrade it to investigation/manual review.
 - Before proposing an edit for CTR/snippet/content opportunities, automatically run a deep-dive diagnostic: SERP snapshot, current title/meta/H1, above-the-fold content packaging, CTA/price-answer check, and zero-click risk classification.
+- Attach SEO review gates to every action/proposal. At minimum, the operator should report:
+  - index/sitemap consistency: noindex URLs absent from sitemap, redirected URLs absent from sitemap, internal links point at canonical destinations
+  - cannibalization intent safety: one intended owner, other pages clearly supporting/noindex/redirect/canonical
+  - internal link graph: hub/category links, adjacent commercial/service links, relevant support/blog/docs links, and cleanup of links to retired/cannibal pages
+  - content depth: no thin SEO pages; require use cases, workflows/process detail, examples, FAQs, and differentiating proof where content changes are proposed
+  - conversion path: mapped qualified action or visible CTA; do not optimize only for raw clicks
+  - Gemini NO-SHIP review: check public strategy leakage, unresolved cannibalization, CTA friction, and technical SEO conflicts
 - If business context deprioritizes a traffic class, reframe the recommendation instead of chasing raw clicks. Example: for a local service business that only values local qualified outcomes, broad national cost-query CTR should become a local intent ownership / consolidation proposal, not a national blog CTR optimization.
 - If business-impact context is incomplete, create an explicit `business_context_request` queue item and surface the questions in the runner result instead of burying them in verification warnings. Missing business context blocks approval/editing, but should not block the diagnostic deep dive.
 
