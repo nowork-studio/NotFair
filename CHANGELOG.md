@@ -22,8 +22,8 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - **`CLAUDE.md`** reframed from "Claude Code plugin" to "host-agnostic plugin." Adding a new skill now requires registering it in **both** `AGENTS.md` and `.claude-plugin/plugin.json`.
 - **`CLAUDE.md` branding rule** — added an explicit "NotFair going forward" section. New user-facing text and docs must use NotFair. Existing legacy `adsagent` references are kept only where they are load-bearing (filesystem migration, prefix detection during the rename window) or historical (CHANGELOG).
 
-### Fixed
-- **Broken MCP server source link in `README.md`** — `https://github.com/nowork-studio/ads-agent` 404'd. Updated to the actual source repo `https://github.com/nowork-studio/adsagent-mcp`.
+### Removed
+- **Stale "server source" link from `README.md`.** The link previously pointed to `nowork-studio/ads-agent` (404) and the actual server source is not public. Removed the pointer entirely — the surrounding paragraph already covers what Toprank users need (endpoint URL, registry name, OAuth flow).
 
 ### Notes
 - No skill behavior changes. All canonical SEO, Google Ads, Meta Ads, and Gemini skills work identically to 0.18.0.
