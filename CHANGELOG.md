@@ -11,6 +11,26 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [0.19.0] — 2026-05-14
+
+### Added — multi-host support
+- **`AGENTS.md` at the repo root** — universal skill resolver. Maps user intents (SEO audit, ad copy, traffic drop, landing page audit, etc.) to the right `SKILL.md` for every supported agent host. Read natively by Codex; read by OpenClaw, Hermes, Cursor, and any agent following `INSTALL_FOR_AGENTS.md`. Claude Code continues to use `.claude-plugin/plugin.json` as before — `AGENTS.md` is additive, not a replacement.
+- **`INSTALL_FOR_AGENTS.md` at the repo root** — single paste-URL install entry point. The user pastes one line into their agent; the agent detects the host (Claude Code / OpenClaw / Codex / Hermes / generic) and follows the matching install branch.
+- **`install/README.md`** — convention for adding future per-host install adapters without duplicating skills. Documents the managed-block fence rule (`<!-- toprank:managed -->`) so installers that write to user-edited config files stay idempotent and preserve hand-edits.
+
+### Changed
+- **`CLAUDE.md`** reframed from "Claude Code plugin" to "host-agnostic plugin." Adding a new skill now requires registering it in **both** `AGENTS.md` and `.claude-plugin/plugin.json`.
+- **`CLAUDE.md` branding rule** — added an explicit "NotFair going forward" section. New user-facing text and docs must use NotFair. Existing legacy `adsagent` references are kept only where they are load-bearing (filesystem migration, prefix detection during the rename window) or historical (CHANGELOG).
+
+### Fixed
+- **Broken MCP server source link in `README.md`** — `https://github.com/nowork-studio/ads-agent` 404'd. Updated to the actual source repo `https://github.com/nowork-studio/adsagent-mcp`.
+
+### Notes
+- No skill behavior changes. All canonical SEO, Google Ads, Meta Ads, and Gemini skills work identically to 0.18.0.
+- OpenClaw multi-site orchestrators under `openclaw/skills/` are unchanged; they're now explicitly tagged as OpenClaw-only in `AGENTS.md`.
+
+---
+
 ## [0.18.0] — 2026-05-09
 
 ### Changed
