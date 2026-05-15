@@ -262,7 +262,7 @@ The Google Ads and Meta Ads surfaces are available as standalone remote MCP serv
 - **Endpoint:** `https://notfair.co/api/mcp/google_ads` (streamable HTTP)
 - **Auth:** OAuth 2.1 with dynamic client registration — your MCP client opens a browser tab to sign in at [notfair.co](https://notfair.co) on first use; the token is stored locally (OS keychain in Claude Code)
 
-Exposes ~100 Google Ads tools across reads (performance, search terms, impression share, keyword ideas, GAQL), writes (pause/enable, bid and budget updates, keyword and negative list management, campaign creation), and a `runScript` tool that fans out up to 20 GAQL queries in parallel for open-ended analytical questions. Source for the hosted server lives in [`nowork-studio/ads-agent`](https://github.com/nowork-studio/ads-agent).
+Exposes ~100 Google Ads tools across reads (performance, search terms, impression share, keyword ideas, GAQL), writes (pause/enable, bid and budget updates, keyword and negative list management, campaign creation), and a `runScript` tool that fans out up to 20 GAQL queries in parallel for open-ended analytical questions. Source for the hosted server lives in [`nowork-studio/adsagent-mcp`](https://github.com/nowork-studio/adsagent-mcp).
 
 ### NotFair-MetaAds
 
