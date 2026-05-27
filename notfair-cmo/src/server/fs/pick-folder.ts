@@ -35,7 +35,10 @@ export async function pickFolder(opts: {
   if (p === "darwin") {
     return pickFolderMac(opts);
   }
-  // TODO: linux (zenity / kdialog), win32 (PowerShell FolderBrowserDialog).
+  if (p === "linux") {
+    return pickFolderLinux(opts);
+  }
+  // TODO: win32 (PowerShell FolderBrowserDialog).
   return { ok: false, kind: "unsupported", platform: p };
 }
 
@@ -107,4 +110,93 @@ async function pickFolderMac(opts: {
   // strip it for consistency with how users typically write paths.
   const normalized = out.replace(/\/+$/, "");
   return { ok: true, path: normalized };
+}
+
+async function pickFolderLinux(opts: {
+  prompt?: string;
+  defaultLocation?: string;
+}): Promise<PickFolderResult> {
+  const prompt = opts.prompt ?? "Select a folder";
+
+  // Try zenity first (GTK-based, most common on GNOME/Ubuntu/Fedora),
+  // fall back to kdialog (KDE/Plasma).
+  const zenityArgs = [
+    "--file-selection",
+    "--directory",
+    `--title=${prompt}`,
+  ];
+  if (opts.defaultLocation) {
+    zenityArgs.push(`--filename=${opts.defaultLocation}/`);
+  }
+
+  const zenityResult = await execDialog("zenity", zenityArgs);
+  if (zenityResult !== null) {
+    return zenityResult;
+  }
+
+  // zenity not available, try kdialog
+  const kdialogArgs = [
+    "--getexistingdirectory",
+    opts.defaultLocation ?? "",
+    "--title",
+    prompt,
+  ];
+
+  const kdialogResult = await execDialog("kdialog", kdialogArgs);
+  if (kdialogResult !== null) {
+    return kdialogResult;
+  }
+
+  // Neither zenity nor kdialog available
+  return {
+    ok: false,
+    kind: "error",
+    message:
+      "No supported dialog tool found. Install zenity (GTK) or kdialog (KDE) for folder picker support.",
+  };
+}
+
+/**
+ * Execute a dialog command and return the result, or null if the command
+ * is not found (ENOENT), indicating we should try the next fallback.
+ */
+async function execDialog(
+  cmd: string,
+  args: string[],
+): Promise<PickFolderResult | null> {
+  return new Promise((resolve) => {
+    execFile(
+      cmd,
+      args,
+      { timeout: DIALOG_TIMEOUT_MS },
+      (err, stdout, stderr) => {
+        if (err) {
+          // ENOENT means the command doesn't exist — try next fallback
+          if ((err as NodeJS.ErrnoException).code === "ENOENT") {
+            resolve(null);
+            return;
+          }
+          // Exit code 1 in zenity/kdialog means user cancelled
+          if ("code" in err && (err as { code: number }).code === 1) {
+            resolve({ ok: false, kind: "cancelled" });
+            return;
+          }
+          resolve({
+            ok: false,
+            kind: "error",
+            message: stderr.trim() || err.message,
+          });
+          return;
+        }
+        const out = stdout.trim();
+        if (!out) {
+          resolve({ ok: false, kind: "cancelled" });
+          return;
+        }
+        // Normalize: strip trailing slash for consistency
+        const normalized = out.replace(/\/+$/, "");
+        resolve({ ok: true, path: normalized });
+      },
+    );
+  });
 }
