@@ -59,7 +59,12 @@ export function queryGeoTargeting(): string {
     `;
 }
 
-/** Q3: Top keywords by spend (with metrics). Positives only — keyword_view includes ad-group negatives. */
+/** Q3: Top keywords by spend (with metrics). Positives only — keyword_view includes ad-group negatives.
+ *  Status filters target the CURRENT live config. GAQL joins historical metrics with point-in-time
+ *  dimensions, so `status = 'ENABLED'` filters to entities active right now — even on a 30-day
+ *  metric window. This is how we stop yesterday's paused keywords from re-surfacing in today's
+ *  "what should I fix" output (the stale-recommendation loop). For historical "what changed"
+ *  analysis, query without these filters. */
 export function queryKeywords(start: string, end: string): string {
   return `
       SELECT
@@ -75,6 +80,8 @@ export function queryKeywords(start: string, end: string): string {
       FROM keyword_view
       WHERE segments.date BETWEEN '${start}' AND '${end}'
         AND campaign.status = 'ENABLED'
+        AND ad_group.status = 'ENABLED'
+        AND ad_group_criterion.status = 'ENABLED'
         AND ad_group_criterion.negative = FALSE
       ORDER BY metrics.cost_micros DESC
       LIMIT 2000
@@ -98,7 +105,11 @@ export function queryQualityScores(): string {
     `;
 }
 
-/** Q5: Top search terms by spend. */
+/** Q5: Top search terms by spend.
+ *  Status filters target current live config — ad groups paused yesterday no longer surface in
+ *  today's recommendation pass (see Q3 for the GAQL semantic). `search_term_view` exposes no
+ *  criterion-level status so the underlying matched-keyword pause case is still possible; the
+ *  per-row `recentChange` annotation (built from `change_event`) covers that remainder. */
 export function querySearchTerms(start: string, end: string): string {
   return `
       SELECT
@@ -110,12 +121,15 @@ export function querySearchTerms(start: string, end: string): string {
       FROM search_term_view
       WHERE segments.date BETWEEN '${start}' AND '${end}'
         AND campaign.status = 'ENABLED'
+        AND ad_group.status = 'ENABLED'
       ORDER BY metrics.cost_micros DESC
       LIMIT 2000
     `;
 }
 
-/** Q6: Converting search terms (used for mining + negative-conflict detection). */
+/** Q6: Converting search terms (used for mining + negative-conflict detection).
+ *  Same current-state status filters as Q5 — mining a paused ad group for new positive keywords
+ *  would propose adding them back to a campaign that no longer serves. */
 export function queryConvertingSearchTerms(start: string, end: string): string {
   return `
       SELECT
@@ -126,6 +140,7 @@ export function queryConvertingSearchTerms(start: string, end: string): string {
       FROM search_term_view
       WHERE segments.date BETWEEN '${start}' AND '${end}'
         AND campaign.status = 'ENABLED'
+        AND ad_group.status = 'ENABLED'
         AND metrics.conversions > 0
       ORDER BY metrics.conversions DESC
       LIMIT 500
@@ -133,7 +148,13 @@ export function queryConvertingSearchTerms(start: string, end: string): string {
 }
 
 /** Q7: Zero-conversion keywords (candidate waste). Positives only — without the negative filter,
- * ad-group negatives would all match conversions=0 by definition (they block serving). */
+ * ad-group negatives would all match conversions=0 by definition (they block serving).
+ *
+ * Status filters on campaign/ad_group/criterion target current live config (see Q3 docstring for
+ * the GAQL semantic). This is THE query that primarily drove the stale-recommendation loop: a
+ * keyword paused yesterday in a still-active campaign used to surface every day until its 30-day
+ * window of spend rolled off. With the criterion-level filter it's gone the moment the pause
+ * commits. */
 export function queryZeroConversionKeywords(start: string, end: string): string {
   return `
       SELECT
@@ -147,6 +168,8 @@ export function queryZeroConversionKeywords(start: string, end: string): string 
       FROM keyword_view
       WHERE segments.date BETWEEN '${start}' AND '${end}'
         AND campaign.status = 'ENABLED'
+        AND ad_group.status = 'ENABLED'
+        AND ad_group_criterion.status = 'ENABLED'
         AND ad_group_criterion.negative = FALSE
         AND metrics.conversions = 0
       ORDER BY metrics.cost_micros DESC

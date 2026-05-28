@@ -57,17 +57,23 @@ const r = await ads.gaqlParallel([
       FROM campaign
       WHERE segments.date DURING LAST_30_DAYS
       ORDER BY metrics.cost_micros DESC\` },
-  // 2. Search terms for wasted-spend detection
+  // 2. Search terms for wasted-spend detection. Status filters target the live config
+  // so terms in ad groups the user paused yesterday don't re-surface today (see rule 6).
   { name: "searchTerms", query: \`
     SELECT search_term_view.search_term, campaign.name, ad_group.name,
            metrics.cost_micros, metrics.clicks, metrics.conversions
       FROM search_term_view
       WHERE segments.date DURING LAST_30_DAYS
+        AND campaign.status = 'ENABLED'
+        AND ad_group.status = 'ENABLED'
         AND metrics.clicks > 5
       ORDER BY metrics.cost_micros DESC\`, limit: 200 },
   // 3. Zero-conversion keywords burning spend.
   // ad_group_criterion.negative = FALSE: keyword_view returns positives AND
   // ad-group negatives; without this filter, every negative matches conversions=0.
+  // The three-level status filter is the stale-loop fix (rule 6): a keyword paused
+  // yesterday is excluded the next time the audit runs — its 30-day spend would
+  // otherwise keep it in the top-waste list until the window rolls off.
   { name: "zeroConvKw", query: \`
     SELECT ad_group_criterion.keyword.text, campaign.name, ad_group.name,
            ad_group_criterion.negative,
@@ -75,6 +81,9 @@ const r = await ads.gaqlParallel([
            ad_group_criterion.quality_info.quality_score
       FROM keyword_view
       WHERE segments.date DURING LAST_30_DAYS
+        AND campaign.status = 'ENABLED'
+        AND ad_group.status = 'ENABLED'
+        AND ad_group_criterion.status = 'ENABLED'
         AND ad_group_criterion.negative = FALSE
         AND metrics.conversions = 0
         AND metrics.cost_micros > 0
@@ -122,6 +131,7 @@ One tool call. ~4 upstream queries. Everything correlated in-script. The agent t
 3. **Cast a wide net on the first call.** If the user says "audit my account", assume they also want to see wasted spend, recent changes, and quality-score laggards — correlating them is free once the queries have run.
 4. **One \`runScript\` call per user question.** If you catch yourself about to call runScript a second time for a related surface, stop and combine them.
 5. **Use \`LAST_N_DAYS\`, \`LAST_7_DAYS\`, \`LAST_30_DAYS\`, \`THIS_MONTH\`, etc.** — the date literal shorthand is faster to write and read than computing bounds.
+6. **Filter on current state for "what should I fix today" questions.** GAQL joins historical metrics with point-in-time config dimensions, so \`campaign.status = 'ENABLED' AND ad_group.status = 'ENABLED' AND ad_group_criterion.status = 'ENABLED'\` excludes entities the user already paused or removed — even on a 30-day metric window. Without these filters, yesterday's paused keyword re-surfaces every day until its spend rolls off the window (stale-recommendation loop). **Drop these filters only for historical analysis** ("why did CPA spike", "what changed last week", "show me the regression"), where a paused entity is part of the answer.
 
 ## Before you query an unfamiliar resource
 

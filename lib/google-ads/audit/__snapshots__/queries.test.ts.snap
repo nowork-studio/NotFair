@@ -171,6 +171,7 @@ exports[`audit queries > queryConvertingSearchTerms — LIMIT 500, conversions >
       FROM search_term_view
       WHERE segments.date BETWEEN '2026-01-01' AND '2026-01-30'
         AND campaign.status = 'ENABLED'
+        AND ad_group.status = 'ENABLED'
         AND metrics.conversions > 0
       ORDER BY metrics.conversions DESC
       LIMIT 500
@@ -242,6 +243,8 @@ exports[`audit queries > queryKeywords — date range + LIMIT 2000 1`] = `
       FROM keyword_view
       WHERE segments.date BETWEEN '2026-01-01' AND '2026-01-30'
         AND campaign.status = 'ENABLED'
+        AND ad_group.status = 'ENABLED'
+        AND ad_group_criterion.status = 'ENABLED'
         AND ad_group_criterion.negative = FALSE
       ORDER BY metrics.cost_micros DESC
       LIMIT 2000
@@ -341,6 +344,7 @@ exports[`audit queries > querySearchTerms — date range + LIMIT 2000 1`] = `
       FROM search_term_view
       WHERE segments.date BETWEEN '2026-01-01' AND '2026-01-30'
         AND campaign.status = 'ENABLED'
+        AND ad_group.status = 'ENABLED'
       ORDER BY metrics.cost_micros DESC
       LIMIT 2000
     "
@@ -383,6 +387,8 @@ exports[`audit queries > queryZeroConversionKeywords — LIMIT 500, conversions 
       FROM keyword_view
       WHERE segments.date BETWEEN '2026-01-01' AND '2026-01-30'
         AND campaign.status = 'ENABLED'
+        AND ad_group.status = 'ENABLED'
+        AND ad_group_criterion.status = 'ENABLED'
         AND ad_group_criterion.negative = FALSE
         AND metrics.conversions = 0
       ORDER BY metrics.cost_micros DESC

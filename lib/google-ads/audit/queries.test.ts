@@ -53,6 +53,12 @@ describe("audit queries", () => {
     // to positives or it surfaces negatives as zombie keywords. See
     // docs/ads-api-landmines.md.
     expect(q).toContain("ad_group_criterion.negative = FALSE");
+    // Current-state filters on every level — stops yesterday's paused entities from
+    // re-surfacing as today's recommendation candidates. GAQL dimensions reflect
+    // query-time state even on a historical metric window.
+    expect(q).toContain("campaign.status = 'ENABLED'");
+    expect(q).toContain("ad_group.status = 'ENABLED'");
+    expect(q).toContain("ad_group_criterion.status = 'ENABLED'");
   });
 
   it("queryQualityScores — matches snapshot", () => {
@@ -63,6 +69,11 @@ describe("audit queries", () => {
     const q = querySearchTerms("2026-01-01", "2026-01-30");
     expect(q).toMatchSnapshot();
     expect(q).toContain("LIMIT 2000");
+    // Current-state filters — search_term_view exposes no criterion-level status
+    // so we filter as deep as the resource allows; the rest is closed by the
+    // per-row recentChange annotation built from change_event.
+    expect(q).toContain("campaign.status = 'ENABLED'");
+    expect(q).toContain("ad_group.status = 'ENABLED'");
   });
 
   it("queryConvertingSearchTerms — LIMIT 500, conversions > 0", () => {
@@ -70,6 +81,9 @@ describe("audit queries", () => {
     expect(q).toMatchSnapshot();
     expect(q).toContain("metrics.conversions > 0");
     expect(q).toContain("LIMIT 500");
+    // Mining for positives only matters on still-serving ad groups.
+    expect(q).toContain("campaign.status = 'ENABLED'");
+    expect(q).toContain("ad_group.status = 'ENABLED'");
   });
 
   it("queryZeroConversionKeywords — LIMIT 500, conversions = 0", () => {
@@ -80,6 +94,12 @@ describe("audit queries", () => {
     // Without this predicate every ad-group negative would match conversions=0
     // (negatives block serving so accumulate 0 of every metric by definition).
     expect(q).toContain("ad_group_criterion.negative = FALSE");
+    // The criterion-level filter is the critical fix for the stale-recommendation
+    // loop: a keyword paused yesterday in a still-active campaign used to keep
+    // surfacing every day until its 30-day window of spend rolled off.
+    expect(q).toContain("campaign.status = 'ENABLED'");
+    expect(q).toContain("ad_group.status = 'ENABLED'");
+    expect(q).toContain("ad_group_criterion.status = 'ENABLED'");
   });
 
   it("queryAds — date range + LIMIT 1000", () => {
