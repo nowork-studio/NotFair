@@ -85,9 +85,16 @@ These live alongside this skill. Read on demand — not preemptively.
 | Quality Score component diagnosis | `references/quality-score-framework.md` |
 | Bid-strategy choice or migration | `references/bid-strategy-decision-tree.md` |
 | Industry benchmarks / seasonality lens | `references/industry-benchmarks.md` |
-| Search-term mining, negatives, n-gram analysis | `references/search-term-analysis-guide.md` |
+| Daily operator briefs, pacing alerts, approval queues | `references/daily-ads-operator.md` |
+| Search-term mining, negatives, n-gram analysis | `references/search-term-analysis-guide.md` + `references/search-term-triage.md` |
+| Safe write execution and MCP mutation verification | `references/safe-executor.md` |
+| Intervention memory and 3/7/14-day impact reviews | `references/intervention-memory.md` |
+| Client-facing ads updates | `references/client-reporter.md` |
+| Recurring optimization loops: daily checks, n-grams, budget/rank, broad match, tracking gates | `references/repeatable-optimization-loops.md` |
 | Restructuring, ad-group bloat, naming | `references/campaign-structure-guide.md` |
 | Reviewing prior changes for impact | `references/session-checks.md` + `references/change-tracking.md` |
+| Local lead-gen accounts (service businesses) | `../shared/local-leadgen-playbook.md` |
+| SaaS / B2B product-led acquisition | `../shared/saas-b2b-playbook.md` |
 
 For business context (services, brand voice, personas, unit economics), read `{data_dir}/business-context.json` and `{data_dir}/personas/{accountId}.json`. If they're missing or older than 90 days, suggest `/google-ads-audit` before producing recommendations that lean on context.
 
@@ -124,3 +131,16 @@ After analysis, proactively offer the next skill when the data clearly points th
 - **Converting search terms not yet keywords (3+ conversions)** → offer to add them with `bulkAddKeywords`
 - **Impression-share decline tied to new competitor pressure** → pull `auction_insight_*` resources via GAQL
 - **Significant structural / bidding change considered** → propose an experiment (`createExperiment` + `addExperimentArms`) instead of a direct mutation, and let real traffic decide
+
+## Recurring optimization posture
+
+When the user asks for an ongoing/repeatable improvement pattern — "check today's keywords", "what should we do next", "keep improving this campaign", "clean up wasted spend", "should we scale?" — start with `references/daily-ads-operator.md`, then pull the narrowest supporting reference. The default posture is:
+
+1. **Measure signal first** — conversion tracking, goal settings, recent changes, budget pacing, and pending intervention reviews.
+2. **Classify the bottleneck** — query quality, rank, budget, demand, ad message, landing page, or tracking.
+3. **Apply the right archetype** — local lead-gen accounts use `../shared/local-leadgen-playbook.md`; SaaS/B2B product-led accounts use `../shared/saas-b2b-playbook.md`.
+4. **Triage search terms before scaling** — use `references/search-term-triage.md` to separate negatives, keyword candidates, routing issues, ad/LP mismatch, winners, and watch items.
+5. **Propose the smallest reversible action** — usually a negative, exact keyword promotion, ad/LP message fix, or experiment; not a budget increase by reflex.
+6. **Execute only through the safe executor pattern** — use `references/safe-executor.md`; approval and live read-back verification are mandatory.
+7. **Record the intervention** — use `references/intervention-memory.md` so 3/7/14-day reviews can decide keep/revert/iterate.
+8. **Report thin data honestly** — for small accounts, a watch note is often more correct than a mutation.

@@ -40,6 +40,100 @@
         "Bid change recommendations stay within the 25% maximum guardrail",
         "References impression share data in the analysis"
       ]
+    },
+    {
+      "id": 4,
+      "prompt": "Check today's keywords for a small bookkeeping Google Ads account. Today has $69 spend, 2 clicks, 39 impressions, 0 conversions; 7d has $227 spend, 9 clicks, 1 conversion. Search terms are 'bookkeeping Seattle' and 'bookkeeping Kirkland'. Campaign is enabled and spending far below daily budget. What is your overview and proposal?",
+      "expected_output": "A concise recent-day operator note that reports evaluated metrics, says data is thin, does not recommend a budget increase, does not overfit 2 clicks, and proposes watching search-term quality / rank or landing-page relevance rather than mutating aggressively.",
+      "files": [
+        "google-ads/manage/references/repeatable-optimization-loops.md"
+      ],
+      "expectations": [
+        "Uses a recent-day/daily-check format with evaluated metrics and 7-day context",
+        "Explicitly labels the data as too thin for a strong conversion-based recommendation",
+        "Does not recommend increasing budget when spend is far below budget",
+        "Focuses next proposal on query quality, rank/relevance, landing page, or watch conditions",
+        "Avoids adding negatives for relevant bookkeeping terms without more evidence"
+      ]
+    },
+    {
+      "id": 5,
+      "prompt": "I have broad match search terms with repeated no-conversion patterns: 'bookkeeping jobs', 'bookkeeper salary', 'free bookkeeping template', 'bookkeeping Seattle', and 'quickbooks cleanup service'. Build a cleanup plan.",
+      "expected_output": "The skill should aggregate by n-gram/action bucket, recommend job/salary/free/template as negative candidates, preserve high-intent commercial/local terms like bookkeeping Seattle and quickbooks cleanup service, and check conflicts before bulk negatives.",
+      "files": [
+        "google-ads/manage/references/search-term-analysis-guide.md",
+        "google-ads/manage/references/repeatable-optimization-loops.md"
+      ],
+      "expectations": [
+        "Groups repeated patterns into n-grams instead of treating every query independently",
+        "Classifies recommendations into action buckets such as negative candidate, keyword candidate, and ad/LP mismatch",
+        "Recommends negatives for job/salary/free/template intent",
+        "Does not negative high-intent local/commercial terms solely because they lack conversions",
+        "Mentions checking positive-keyword/search-term conflicts before executing bulk negatives"
+      ]
+    },
+    {
+      "id": 6,
+      "prompt": "Daily CentsIQ ads: yesterday spent $70 on 3 clicks and 0 leads, 7-day baseline is $230 spend, 9 clicks, 1 lead. The main keyword was bookkeeper Seattle. Search terms are relevant but sparse. What should the operator brief say?",
+      "expected_output": "A daily ads operator brief with scope/window, snapshot, budget/pacing context, thin-data caveat, watch threshold for bookkeeper Seattle, no aggressive negative or budget change, and an approval queue only if there is a clearly safe action.",
+      "files": [
+        "google-ads/manage/references/daily-ads-operator.md",
+        "google-ads/shared/local-leadgen-playbook.md"
+      ],
+      "expectations": [
+        "Uses daily operator format with scope, snapshot, read, watch, recommendations",
+        "Calls out thin data and avoids overfitting 3 clicks",
+        "Does not recommend raising budget without budget-lost evidence or proven CPA",
+        "Frames bookkeeper Seattle as a watch item with threshold rather than immediate pause",
+        "Keeps client/business lead-quality context visible"
+      ]
+    },
+    {
+      "id": 7,
+      "prompt": "Search term cleanup: broad match produced terms jobs, salary, free template, bookkeeping Seattle, quickbooks cleanup service, and bookkeeping course. Build the proposed actions.",
+      "expected_output": "Classifies terms into action buckets; recommends negatives for jobs/salary/free template/course; preserves bookkeeping Seattle and quickbooks cleanup service as watch/keyword candidates unless economics prove otherwise; says approval and conflict checks are required before mutation.",
+      "files": [
+        "google-ads/manage/references/search-term-triage.md",
+        "google-ads/shared/local-leadgen-playbook.md"
+      ],
+      "expectations": [
+        "Groups bad intent patterns rather than treating every term independently",
+        "Recommends negatives for employment/training/free-template intent",
+        "Does not negative plausible commercial local/service terms solely for no conversions",
+        "Mentions conflict checks before negatives",
+        "Produces an approval-ready action queue"
+      ]
+    },
+    {
+      "id": 8,
+      "prompt": "Apply approved negative keywords. The tool returned changeId 123 but success=false with authorization_error=7. What should you tell the user and do next?",
+      "expected_output": "Does not claim success; explains that changeId can represent an attempted-change log, verifies live state, preserves the error/request details, compares nearby successful writes, and recommends safe debugging or tool feedback instead of retrying blindly.",
+      "files": [
+        "google-ads/manage/references/safe-executor.md"
+      ],
+      "expectations": [
+        "Does not treat changeId as proof of live Google Ads state",
+        "Requires live read-back verification",
+        "Separates failed/unverified writes from successful writes",
+        "Preserves useful error details",
+        "Avoids blind repeated retries"
+      ]
+    },
+    {
+      "id": 9,
+      "prompt": "For a NotFair Google Ads MCP campaign on Maximize Clicks with cheap generic MCP traffic and no signups, what should we improve first?",
+      "expected_output": "Uses the SaaS/B2B playbook: avoid optimizing for cheap clicks, tighten generic curiosity/search-term waste, improve brand/trust and landing-page message match, prefer activation-level conversions such as connected account or first successful action, and delay budget scaling until query quality and activation signal improve.",
+      "files": [
+        "google-ads/shared/saas-b2b-playbook.md",
+        "google-ads/manage/references/daily-ads-operator.md"
+      ],
+      "expectations": [
+        "Rejects cheap clicks as the success metric",
+        "Prioritizes activation-quality conversion signal over raw signup/clicks",
+        "Calls out brand trust / unclear relationship risk for tool integrations",
+        "Recommends search-term cleanup before scaling",
+        "Does not recommend immediate budget increase"
+      ]
     }
   ]
 }

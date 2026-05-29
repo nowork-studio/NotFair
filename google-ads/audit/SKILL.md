@@ -45,6 +45,7 @@ You decide the exact GAQL shape, but a defensible audit needs to see, at minimum
 - Search terms (`search_term_view`)
 - Negative keywords and shared lists (`campaign_criterion` + shared sets)
 - Conversion actions (`conversion_action`) — including counting type, attribution model, primary/secondary
+- Network segmentation (`segments.ad_network_type`) when diagnosing CPA/CVR shifts or Search Partners
 - RSA assets (`ad_group_ad`)
 - Geo targeting (`campaign_criterion` LOCATION + PROXIMITY)
 - Recent change events (`change_event`, last 30 days) — for explaining regressions
@@ -79,6 +80,8 @@ To compute and back the pulse metrics, you'll need to look across these seven ar
 5. **Ad Copy & Creative** — RSA coverage, asset variety, sitelink/callout/structured-snippet completeness, PMax asset-group health.
 6. **Impression Share** — read rank-lost vs budget-lost together (see the 2×2 matrix in `account-health-scoring.md`); they're different problems with different fixes.
 7. **Spend Efficiency** — waste vs. headroom, brand vs. non-brand split, concentration risk.
+
+For Signal Quality and network-mix questions, read `references/conversion-network-audit.md`. It adds the prerequisite checks for conversion-action integrity, Search Partners, Display leakage in Search campaigns, and regression decomposition.
 
 Per-area findings only show up in the report when the area surfaced something material. Cite specific entities, dollars, and time windows. "Some keywords are underperforming" is not a finding; "Campaign X has $1,840 in last-30-day spend on 12 keywords with 0 conversions and QS ≤ 4" is.
 

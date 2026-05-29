@@ -184,9 +184,22 @@ N-gram analysis identifies recurring word patterns in search terms to find syste
 ### How to Run N-gram Analysis
 
 1. Export search term report (last 30-90 days)
-2. Split each search term into individual words (unigrams) and word pairs (bigrams)
-3. Aggregate clicks, cost, and conversions by each n-gram
+2. Split each search term into individual words (unigrams), word pairs (bigrams), and three-word phrases (trigrams)
+3. Aggregate clicks, cost, impressions, conversions, conversion value, distinct queries, campaigns, and ad groups by each n-gram
 4. Sort by cost descending to find the most expensive patterns
+5. Classify each pattern into an action bucket before recommending a mutation
+
+### Generalized Action Buckets
+
+| Bucket | Signal | Action |
+|--------|--------|--------|
+| Negative candidate | Irrelevant intent, wrong geography, job seeker, DIY/info, free/cheap when not offered, unwanted competitor/name-seeking | Add negative after checking positive/search-term conflicts |
+| Keyword candidate | Converting query/n-gram not present as a positive keyword | Add as exact or phrase in the most relevant ad group |
+| Routing candidate | Same query/n-gram served by multiple ad groups with divergent CPA/CVR | Add keyword to the best-fit ad group and negative-route from the wrong group |
+| Ad/LP mismatch | Relevant query, poor performance, weak ad relevance or LPX | Rewrite RSA, split ad group, or improve landing page message match |
+| Product/content opportunity | Repeated relevant demand not currently targeted or sold | Flag opportunity; do not negative unless business confirms it is unwanted |
+
+High-spend/no-conversion n-grams are review triggers, not automatic negatives. Always inspect examples.
 
 ### Common High-Waste N-grams (Cross-Industry)
 

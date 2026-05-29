@@ -14,9 +14,12 @@ Google Ads campaigns fail on the landing page more often than in the auction. A 
 
 Only score pages that actually run ad traffic. Don't score random marketing pages. Run this on direct request, on auto-handoff from `/google-ads-audit` (high-CTR / low-CVR ad groups), when QS diagnosis flags "Landing Page Experience: Below Average", or as a preflight before `/google-ads-copy` writes new copy for a page nobody's validated.
 
+When the question is about ad-to-page fit, high CTR / low CVR, LPX, or testing ads and landing pages together, read `references/message-chain-testing.md` before scoring. It keeps the diagnosis focused on the paid-search message chain instead of drifting into a generic web-design audit.
+
 ## Reference
 
 - `references/scoring-rubric.md` — the 5-dimension weighted rubric, thresholds, and evidence fields. Read before scoring.
+- `references/message-chain-testing.md` — query → ad → page message-chain diagnosis and ad+LP test design.
 - `../manage/references/quality-score-framework.md` — only when the user's explicit goal is QS improvement.
 
 ## Phase 1: Resolve the target pages

@@ -11,6 +11,20 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [0.25.5] — 2026-05-28
+
+### Added
+
+- Added Google Ads operator references for daily briefs, search-term triage, safe MCP execution, intervention memory, client reporting, local lead-gen accounts, and SaaS/B2B product-led accounts.
+- Added Google Ads management evals covering daily operator briefs, safe search-term cleanup, failed mutation handling, and NotFair-style SaaS activation optimization.
+
+### Changed
+
+- Expanded Google Ads skills with repeatable optimization loops for search-term/n-gram triage, budget/rank diagnosis, broad match containment, RSA testing, landing-page message-chain testing, and conversion/network integrity checks.
+- Updated `/google-ads` routing guidance to use the new daily operator, safe executor, intervention memory, and domain playbook references for recurring account-management workflows.
+
+---
+
 ## [0.25.4] — 2026-05-28
 
 ### Changed

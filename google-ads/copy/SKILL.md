@@ -17,6 +17,7 @@ Read and follow `../shared/preamble.md` (MCP detection, account selection) and `
 Read on demand:
 
 - `references/rsa-best-practices.md` — character limits, headline formulas, pinning, A/B mechanics, common mistakes. The source of truth for what to write.
+- `references/rsa-testing-lab.md` — how to choose RSA test metrics, diagnose ad-group intent bloat, decide pinning, and avoid chasing Ad Strength over business outcomes.
 - `../manage/references/industry-benchmarks.md` — industry CTR/CVR benchmarks for sanity-checking targets.
 - `../manage/references/quality-score-framework.md` — only when QS improvement is the explicit goal.
 
@@ -67,6 +68,8 @@ When the user wants to test, use the MCP server's experiment tooling rather than
 - **Single ad-group, two variants, no traffic split** — paused-then-enabled twin ads in the same ad group is still acceptable for low-stakes copy iteration, but it has no statistical engine behind it. Prefer the experiment path when the decision matters.
 
 Each variant must test a **meaningfully different angle** — not word swaps. "Trust & Expertise" vs. "Speed & Convenience" vs. "Price & Value" is a real test; "Call Today" vs. "Call Now" is noise.
+
+Before writing variants, read `references/rsa-testing-lab.md` when the request mentions testing, pinning, Ad Strength, low CTR/CVR, or mixed-intent ad groups. It encodes the generalized pattern that many RSA problems are really ad-group/query-theme problems.
 
 When calling a winner, the underlying question is the same regardless of mechanism: did the variant win on conversion rate (or CPA), backed by enough sample to trust the difference? Less than ~100 clicks per variant is too early. ≥20% relative CTR or CVR delta is meaningful. 2× CVR gap is decisive immediately. The experiments framework's own significance signals are the cleanest input — defer to them when present.
 
