@@ -30,6 +30,7 @@ export type PickFolderResult =
 export async function pickFolder(opts: {
   prompt?: string;
   defaultLocation?: string;
+  signal?: AbortSignal;
 }): Promise<PickFolderResult> {
   const p = platform();
   if (p === "darwin") {
@@ -42,6 +43,7 @@ export async function pickFolder(opts: {
 async function pickFolderMac(opts: {
   prompt?: string;
   defaultLocation?: string;
+  signal?: AbortSignal;
 }): Promise<PickFolderResult> {
   // Build the AppleScript expression carefully: we control both args, so
   // there's no untrusted shell-injection vector, but we still escape any
@@ -73,7 +75,7 @@ async function pickFolderMac(opts: {
     execFile(
       "/usr/bin/osascript",
       ["-e", script],
-      { timeout: DIALOG_TIMEOUT_MS },
+      { timeout: DIALOG_TIMEOUT_MS, signal: opts.signal },
       (err, stdout, stderr) => {
         // With default options (no encoding override), Node returns
         // stdout/stderr as strings. err carries .code on timeout /
@@ -86,8 +88,6 @@ async function pickFolderMac(opts: {
         resolve({ stdout, stderr, code: errCode });
       },
     );
-    // We don't wire up an AbortSignal here; the DIALOG_TIMEOUT_MS ceiling
-    // protects against a wedged osascript subprocess.
   });
 
   if (result.code !== 0) {
