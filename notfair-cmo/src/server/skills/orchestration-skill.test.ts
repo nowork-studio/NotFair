@@ -86,6 +86,43 @@ describe("ORCHESTRATION_SKILL", () => {
     expect(s).not.toContain("<propose_cron>");
   });
 
+  it("teaches the workspace browser tool inventory", () => {
+    const s = getOrchestrationSkill();
+    for (const tool of [
+      "browser_status",
+      "browser_tabs",
+      "browser_open",
+      "browser_close",
+      "browser_navigate",
+      "browser_snapshot",
+      "browser_click",
+      "browser_type",
+      "browser_press",
+      "browser_scroll",
+      "browser_back",
+      "browser_shutdown",
+    ]) {
+      expect(s).toContain(tool);
+    }
+  });
+
+  it("teaches the snapshot → act → snapshot discipline (stale refs are the #1 browser bug)", () => {
+    const s = getOrchestrationSkill();
+    expect(s).toMatch(/snapshot AGAIN/i);
+    expect(s).toMatch(/[Ss]tale refs/);
+  });
+
+  it("teaches agents to use agent_id as their browser tab label", () => {
+    const s = getOrchestrationSkill();
+    expect(s).toMatch(/label.*agent_id/i);
+  });
+
+  it("teaches agents to report login/captcha/2FA as blockers via submit_task_status", () => {
+    const s = getOrchestrationSkill();
+    expect(s).toMatch(/captcha|2FA|login wall/i);
+    expect(s).toMatch(/submit_task_status.*blocked/);
+  });
+
   it("includes a 'Your role:' section selector so role-specific content sits ABOVE", () => {
     // The skill should sound like a how-to manual, NOT contain role
     // declarations like "You are the CMO" / "You are a worker" — those
