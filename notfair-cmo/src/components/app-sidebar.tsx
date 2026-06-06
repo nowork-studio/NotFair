@@ -33,6 +33,7 @@ import { ProjectSwitcher } from "./project-switcher";
 import { AgentNav } from "./agent-nav";
 import { ApprovalsLiveBadge } from "./live-badge";
 import { HarnessFooter } from "./harness-footer";
+import { SidebarVersion } from "./sidebar-version";
 
 type NavItem = {
   href: string;
@@ -130,14 +131,15 @@ export async function AppSidebar() {
         )}
       </SidebarContent>
 
-      {active && harnessUsage && (
-        <SidebarFooter className="border-t border-border/60 px-3 py-2 group-data-[collapsible=icon]:hidden">
+      <SidebarFooter className="border-t border-border/60 px-3 py-2 group-data-[collapsible=icon]:hidden">
+        {active && harnessUsage && (
           <HarnessFooter
             adapter={active.harness_adapter}
             usage={harnessUsage}
           />
-        </SidebarFooter>
-      )}
+        )}
+        <SidebarVersion />
+      </SidebarFooter>
     </Sidebar>
   );
 }
