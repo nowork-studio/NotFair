@@ -15,7 +15,6 @@ vi.mock("@/server/browser/session", () => ({
     launchedAt: 1_000,
     uptimeMs: 5_000,
   })),
-  stopBrowser: vi.fn(async () => {}),
 }));
 
 vi.mock("@/server/browser/tabs", () => ({
@@ -74,7 +73,7 @@ afterEach(() => {
 // ── Registry shape ─────────────────────────────────────────────────────
 
 describe("BROWSER_TOOLS registry", () => {
-  it("exposes exactly the 12 expected tools (status, tabs, open, close, navigate, snapshot, click, type, press, scroll, back, shutdown)", () => {
+  it("exposes exactly the 11 expected tools (no shutdown — that's intentionally user-only)", () => {
     expect(BROWSER_TOOLS.map((t) => t.name).sort()).toEqual(
       [
         "browser_back",
@@ -84,13 +83,17 @@ describe("BROWSER_TOOLS registry", () => {
         "browser_open",
         "browser_press",
         "browser_scroll",
-        "browser_shutdown",
         "browser_snapshot",
         "browser_status",
         "browser_tabs",
         "browser_type",
       ].sort(),
     );
+  });
+
+  it("does NOT expose browser_shutdown to agents (multi-agent safety: any agent calling it would kill Chrome for the others)", () => {
+    const names = BROWSER_TOOLS.map((t) => t.name);
+    expect(names).not.toContain("browser_shutdown");
   });
 
   it("each tool ships a non-empty description and a zod inputSchema", () => {
@@ -347,7 +350,7 @@ describe("browser_scroll", () => {
   });
 });
 
-// ── browser_back / browser_shutdown ────────────────────────────────────
+// ── browser_back ───────────────────────────────────────────────────────
 
 describe("browser_back", () => {
   it("invokes actions.back", async () => {
@@ -357,13 +360,5 @@ describe("browser_back", () => {
     );
     expect(result.ok).toBe(true);
     expect(actions.back).toHaveBeenCalledOnce();
-  });
-});
-
-describe("browser_shutdown", () => {
-  it("calls stopBrowser and reports success", async () => {
-    const result = await tool("browser_shutdown").handler({ project_slug: "acme" }, {});
-    expect(result.ok).toBe(true);
-    expect(session.stopBrowser).toHaveBeenCalledWith("acme");
   });
 });

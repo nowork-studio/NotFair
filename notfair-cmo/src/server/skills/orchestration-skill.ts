@@ -160,9 +160,11 @@ re-verification now, only the user can give it.
 - \`browser_press\` — single key / chord (Tab, Escape, Control+a, ...).
 - \`browser_scroll\` — viewport scroll up/down/left/right.
 - \`browser_back\` — history back.
-- \`browser_shutdown\` — stop the workspace browser. Use only when the
-  user explicitly asks. Cookies persist; the next \`browser_open\`
-  relaunches with the same session.
+
+You CANNOT stop the workspace browser. Browser lifecycle belongs to the
+user (Settings → Workspace browser → Stop). This is deliberate: every
+agent in this workspace shares one Chrome, so stopping it would interrupt
+your teammates mid-task.
 
 ## Scheduling recurring work
 

@@ -100,10 +100,15 @@ describe("ORCHESTRATION_SKILL", () => {
       "browser_press",
       "browser_scroll",
       "browser_back",
-      "browser_shutdown",
     ]) {
       expect(s).toContain(tool);
     }
+  });
+
+  it("tells agents they CANNOT stop the workspace browser (multi-agent safety)", () => {
+    const s = getOrchestrationSkill();
+    expect(s).toMatch(/cannot stop/i);
+    expect(s).not.toContain("browser_shutdown");
   });
 
   it("teaches the snapshot → act → snapshot discipline (stale refs are the #1 browser bug)", () => {

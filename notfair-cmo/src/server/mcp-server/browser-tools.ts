@@ -19,7 +19,7 @@ import {
   type as actType,
   type SnapshotElement,
 } from "@/server/browser/actions";
-import { getOrLaunchBrowser, getSessionStatus, stopBrowser } from "@/server/browser/session";
+import { getOrLaunchBrowser, getSessionStatus } from "@/server/browser/session";
 import { closeTab, getTab, listTabs, openTab } from "@/server/browser/tabs";
 
 import type { ToolDefinition, ToolResult } from "./tools";
@@ -352,20 +352,12 @@ async function handleBrowserBack(input: unknown): Promise<ToolResult> {
   return result;
 }
 
-// ── browser_shutdown (admin) ───────────────────────────────────────────
-
-const browserShutdownInput = z.object({ project_slug: projectSlug });
-
-async function handleBrowserShutdown(input: unknown): Promise<ToolResult> {
-  const parsed = browserShutdownInput.safeParse(input);
-  if (!parsed.success) return invalid(parsed.error);
-  try {
-    await stopBrowser(parsed.data.project_slug);
-    return txt(`Workspace browser for "${parsed.data.project_slug}" stopped.`);
-  } catch (err) {
-    return fail(`browser_shutdown failed: ${safeMessage(err)}`);
-  }
-}
+// browser_shutdown is intentionally NOT exposed as an agent tool. With multiple
+// agents sharing one workspace Chrome, any agent calling shutdown would kill
+// the browser out from under the others mid-task. Browser lifecycle stays
+// owned by the user (Settings → Workspace browser → Stop) and by process exit
+// hooks. The /api/browser/shutdown route imports stopBrowser directly from
+// session.ts; agents do not get this primitive.
 
 // ── Helpers ────────────────────────────────────────────────────────────
 
@@ -456,12 +448,5 @@ export const BROWSER_TOOLS: ToolDefinition[] = [
       "Navigate back one entry in the tab's history. No-ops cleanly on the first page (no error).",
     inputSchema: browserBackInput,
     handler: handleBrowserBack,
-  },
-  {
-    name: "browser_shutdown",
-    description:
-      "Stop the workspace browser. Use rarely — only when the user explicitly asks to close it. Cookies persist in the profile dir, so the next browser_open relaunches with the same session.",
-    inputSchema: browserShutdownInput,
-    handler: handleBrowserShutdown,
   },
 ];
