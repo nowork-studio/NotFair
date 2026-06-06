@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import { getProject } from "@/server/db/projects";
 import { DangerZone } from "@/components/danger-zone";
 import { ProjectRenameCard } from "@/components/project-rename-card";
+import { WorkspaceBrowserCard } from "@/components/workspace-browser-card";
 
 export default async function SettingsPage({
   params,
@@ -58,6 +59,13 @@ export default async function SettingsPage({
             </dd>
           </dl>
         </div>
+      </section>
+
+      <section>
+        <h2 className="ns-h2">
+          <span>Workspace browser</span>
+        </h2>
+        <WorkspaceBrowserCard projectSlug={project.slug} />
       </section>
 
       <section>
