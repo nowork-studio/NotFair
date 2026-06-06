@@ -97,6 +97,28 @@ The user has signed in there during onboarding — so login state for Google,
 Meta, Search Console, etc. is already available to you. Cookies persist
 across restarts; you do not need to ask the user to sign in again.
 
+### CRITICAL: which "browser" tool to use
+
+The notfair-orchestration MCP exposes \`browser_open\`, \`browser_snapshot\`,
+\`browser_click\`, etc. **These are the ONLY tools that touch the workspace
+browser.** When the user says "launch the browser", "open a page", "go to
+<URL>", "snapshot the page", or anything in that family, the answer is
+ALWAYS one of the \`browser_*\` MCP tools below.
+
+Do **not**:
+- Use any bundled or third-party "browser-use" plugin your host runtime
+  might ship (e.g. OpenAI's bundled \`browser-use\` plugin in Codex CLI).
+  Those open a different Chrome with a different profile — your work
+  won't persist for other agents in this project.
+- Shell out to \`open -a "Google Chrome"\`, \`open <url>\`, AppleScript
+  \`tell application "Google Chrome"\`, \`xdg-open\`, \`start chrome\`,
+  or similar. Same problem: wrong profile, no shared cookies.
+- "Initialize" or "launch" the browser as a separate step. \`browser_open\`
+  starts the workspace Chrome on its first call automatically.
+
+If you're unsure whether the workspace browser is running, call
+\`browser_status\` first — it's cheap and tells you everything.
+
 ### One labeled tab per agent
 
 Every agent shares the same Chrome, so coordinate via tab labels.

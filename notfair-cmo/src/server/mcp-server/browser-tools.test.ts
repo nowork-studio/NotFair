@@ -102,6 +102,32 @@ describe("BROWSER_TOOLS registry", () => {
       expect(typeof t.inputSchema.safeParse).toBe("function");
     }
   });
+
+  it("browser_open description does tool routing (claims the 'launch browser' intent and warns off competitors)", () => {
+    // Regression guard: real failure observed where the bundled
+    // OpenAI browser-use plugin / `open -a "Google Chrome"` shell won
+    // the intent. Descriptions are the first thing the model reads
+    // when picking a tool, so they have to fight for it explicitly.
+    const open = BROWSER_TOOLS.find((t) => t.name === "browser_open");
+    expect(open).toBeDefined();
+    expect(open!.description).toMatch(/launch the browser|open a page/i);
+    expect(open!.description).toMatch(/browser-use|open -a|AppleScript/i);
+    expect(open!.description).toMatch(/persistent profile|workspace browser/i);
+  });
+
+  it("every navigation/discovery tool description mentions the workspace profile so agents don't pick a different browser", () => {
+    const guarded = ["browser_status", "browser_tabs", "browser_open", "browser_navigate"];
+    for (const name of guarded) {
+      const t = BROWSER_TOOLS.find((x) => x.name === name)!;
+      expect(t.description).toMatch(/workspace browser|notfair-cmo workspace/i);
+    }
+  });
+
+  it("interaction tool descriptions teach stale-ref recovery", () => {
+    const snapshot = BROWSER_TOOLS.find((t) => t.name === "browser_snapshot")!;
+    expect(snapshot.description).toMatch(/[Ss]tale/);
+    expect(snapshot.description).toMatch(/snapshot again/i);
+  });
 });
 
 // ── browser_status ─────────────────────────────────────────────────────

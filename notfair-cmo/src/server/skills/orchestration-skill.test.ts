@@ -128,6 +128,16 @@ describe("ORCHESTRATION_SKILL", () => {
     expect(s).toMatch(/submit_task_status.*blocked/);
   });
 
+  it("explicitly tells agents NOT to use bundled browser-use plugins or `open -a` shell commands", () => {
+    // Regression guard: real failure observed where Greg launched
+    // OpenAI's bundled `browser-use` plugin instead of browser_open,
+    // then fell back to `open -a "Google Chrome"` (wrong profile).
+    const s = getOrchestrationSkill();
+    expect(s).toMatch(/browser-use/i);
+    expect(s).toMatch(/open -a/);
+    expect(s).toMatch(/different Chrome|wrong profile|won't persist/i);
+  });
+
   it("includes a 'Your role:' section selector so role-specific content sits ABOVE", () => {
     // The skill should sound like a how-to manual, NOT contain role
     // declarations like "You are the CMO" / "You are a worker" — those

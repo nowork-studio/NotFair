@@ -373,79 +373,115 @@ function isToolResult(x: unknown): x is ToolResult {
 
 // ── Registry export ────────────────────────────────────────────────────
 
+// ─── Tool descriptions ───────────────────────────────────────────────────
+// Following Hermes' convention (tools/browser_tool.py:1473), every browser
+// tool description does explicit traffic control: when to use it, when
+// something else is better, and (importantly) what NOT to fall back to.
+// This matters because notfair-cmo runs agents under Codex CLI / Claude
+// Code, both of which may ship bundled "browser" plugins that compete
+// for the same intent. Strong descriptions outcompete generic plugins by
+// making the right tool obviously the right choice.
+
+const ROUTING_PREAMBLE =
+  "This is the ONLY browser tool that drives the notfair-cmo workspace browser " +
+  "(persistent profile at ~/.notfair-cmo/projects/<slug>/browser/, shared by " +
+  "every agent in the project, where the user has signed into Google/Meta/etc.). " +
+  "Do NOT use any other 'browser-use' plugin, `open -a 'Google Chrome'` shell " +
+  "commands, AppleScript, or similar — those launch a different Chrome with the " +
+  "user's personal profile and your work won't persist for other agents in this " +
+  "project.";
+
 export const BROWSER_TOOLS: ToolDefinition[] = [
   {
     name: "browser_status",
     description:
-      "Check whether the workspace browser is running and where its profile lives. Cheap; safe to call before any other browser tool.",
+      "Check whether the workspace browser is running, on which port, and where its profile lives. Cheap; safe to call any time. " +
+      ROUTING_PREAMBLE,
     inputSchema: browserStatusInput,
     handler: handleBrowserStatus,
   },
   {
     name: "browser_tabs",
     description:
-      "List every tab in the workspace browser with its handle, URL, and title. Call before browser_open to avoid duplicating a tab that already exists for your agent.",
+      "List every tab in the workspace browser with handle, URL, and title. Call before browser_open to find an existing tab you can reuse instead of duplicating. " +
+      ROUTING_PREAMBLE,
     inputSchema: browserTabsInput,
     handler: handleBrowserTabs,
   },
   {
     name: "browser_open",
     description:
-      "Open (or reuse) a tab. Pass your agent_id as `label` so subsequent calls can target the same tab by handle. If `label` already exists, this navigates that tab instead of duplicating it. Returns a TabHandle.",
+      "Open (or reuse) a tab in the workspace browser. THIS is the tool to call when the user says 'launch the browser', 'open a page', 'go to <URL>', etc. " +
+      "Pass your agent_id as `label` so future calls can target the tab by handle; reusing an existing label navigates that tab instead of duplicating it. " +
+      "Returns a TabHandle with `id` you pass as `target_id` to subsequent browser_* calls. " +
+      "For plain-text fetches (.json, .txt, .md, raw GitHub URLs, documented HTTP APIs) prefer curl via the shell — the browser stack is overkill. " +
+      "But for ANYTHING that needs a real browser (logged-in dashboards, dynamic pages, sign-in flows, Google Ads/Search Console/Meta UIs), use browser_open. " +
+      ROUTING_PREAMBLE,
     inputSchema: browserOpenInput,
     handler: handleBrowserOpen,
   },
   {
     name: "browser_close",
-    description: "Close a tab by handle. Safe no-op if the handle is unknown.",
+    description:
+      "Close a tab by handle. Safe no-op if the handle is unknown. Does NOT stop the workspace browser — only the user can do that via Settings.",
     inputSchema: browserCloseInput,
     handler: handleBrowserClose,
   },
   {
     name: "browser_navigate",
-    description: "Navigate an existing tab to a new URL. Returns the loaded URL + title.",
+    description:
+      "Navigate an EXISTING tab (already opened via browser_open) to a new URL. Returns the loaded URL + title. " +
+      "For opening a brand-new tab, use browser_open instead. " +
+      ROUTING_PREAMBLE,
     inputSchema: browserNavigateInput,
     handler: handleBrowserNavigate,
   },
   {
     name: "browser_snapshot",
     description:
-      "Capture the page's interactable elements (buttons, links, inputs, etc.) with stable refs like e1/e2 plus a text excerpt. Snapshot the tab before any click/type so your refs are fresh — refs from a prior snapshot become stale after navigation or DOM mutation.",
+      "Capture the page's interactable elements (buttons, links, inputs, etc.) with stable refs like e1/e2 plus a text excerpt. " +
+      "Snapshot the tab before EVERY click/type so refs are fresh — refs from a prior snapshot become stale after navigation, form submit, or DOM mutation, and stale refs fail with a clear error. " +
+      "If you ever see 'ref e3 not found', the answer is always: snapshot again, then retry with the new ref. Never blindly retry the same ref.",
     inputSchema: browserSnapshotInput,
     handler: handleBrowserSnapshot,
   },
   {
     name: "browser_click",
     description:
-      "Click an element by ref (from the latest browser_snapshot). Supports right/middle/double click and keyboard modifiers.",
+      "Click an element by ref from the LATEST browser_snapshot on the same tab. Supports right/middle/double click and keyboard modifiers (Meta/Control/Alt/Shift). " +
+      "If the ref is stale, snapshot the tab again and retry with the new ref — don't keep clicking a missing ref.",
     inputSchema: browserClickInput,
     handler: handleBrowserClick,
   },
   {
     name: "browser_type",
     description:
-      "Type text into an input/textarea/contenteditable ref. By default clears the field first; set submit=true to press Enter when done.",
+      "Type text into an input/textarea/contenteditable ref. By default clears the field first; pass clear_first=false to append. " +
+      "Set submit=true to press Enter when done (use this for search boxes, login forms). " +
+      "Ref must come from the most recent browser_snapshot — re-snapshot if the page has changed since.",
     inputSchema: browserTypeInput,
     handler: handleBrowserType,
   },
   {
     name: "browser_press",
     description:
-      "Press a single key or key combo. With `ref` set, focuses that element first; without, presses at the page keyboard level (e.g. Escape to dismiss a modal).",
+      "Press a single key or key combo (e.g. 'Enter', 'Tab', 'Escape', 'Control+a', 'ArrowDown'). " +
+      "With `ref` set, focuses that element first; without, presses at the page/keyboard level — use the ref-less form to dismiss modals (Escape) or trigger global shortcuts.",
     inputSchema: browserPressInput,
     handler: handleBrowserPress,
   },
   {
     name: "browser_scroll",
     description:
-      "Scroll the viewport up/down/left/right. Defaults to ~600px (about one screen). Use when elements aren't visible in the current snapshot.",
+      "Scroll the viewport up/down/left/right by `amount` pixels (default ~600, about one screen). " +
+      "Use when interactable elements you need aren't in the current snapshot — scroll, then snapshot again to discover newly-visible elements.",
     inputSchema: browserScrollInput,
     handler: handleBrowserScroll,
   },
   {
     name: "browser_back",
     description:
-      "Navigate back one entry in the tab's history. No-ops cleanly on the first page (no error).",
+      "Navigate back one entry in the tab's history. No-ops cleanly on the first page (no error). After navigating back, snapshot the tab again before clicking anything — the DOM changed.",
     inputSchema: browserBackInput,
     handler: handleBrowserBack,
   },
