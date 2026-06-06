@@ -54,13 +54,17 @@ export async function* executeCodexLocal(
   // env var per MCP server the project has registered so each server gets
   // its OWN bearer:
   //   - notfair-orchestration: shared per-machine secret
+  //   - notfair-browser: same shared per-machine secret (both are
+  //     internal notfair-cmo servers on loopback)
   //   - notfair-googleads, gsc, etc.: per-project OAuth token from
   //     `mcp_tokens`
   // Without per-server env vars every MCP would auth with the same
   // (wrong) bearer and codex would either surface it as Auth Unsupported
   // or pass the wrong token to the wrong server.
+  const mcpSecret = getOrCreateMcpServerSecret();
   const mcpEnv: Record<string, string> = {
-    [CODEX_BEARER_ENV_VAR]: getOrCreateMcpServerSecret(),
+    [CODEX_BEARER_ENV_VAR]: mcpSecret,
+    [bearerEnvVarForServer("notfair-browser")]: mcpSecret,
   };
   for (const token of listProjectMcpTokens(ctx.projectSlug)) {
     mcpEnv[bearerEnvVarForServer(token.server_name)] = token.access_token_enc;

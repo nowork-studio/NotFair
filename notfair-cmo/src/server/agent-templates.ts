@@ -10,7 +10,10 @@ import { getProject } from "@/server/db/projects";
 import { getOrchestrationSkill } from "@/server/skills/orchestration-skill";
 import { readProjectBrief } from "@/server/onboarding/project-brief";
 import { DEFAULT_HARNESS_ADAPTER } from "@/server/adapters/registry";
-import { registerOrchestrationForAgent } from "@/server/mcp-server/registration";
+import {
+  registerBrowserMcpForAgent,
+  registerOrchestrationForAgent,
+} from "@/server/mcp-server/registration";
 
 /**
  * Role-specific behavior for the CMO. Concise — the procedural how-to
@@ -495,6 +498,17 @@ export async function ensureProjectAgents(
       } catch (err) {
         console.warn(
           `[provision] orchestration MCP registration failed for ${agentId}:`,
+          err,
+        );
+      }
+      // Wire notfair-browser MCP for this agent so browser_open /
+      // browser_snapshot / browser_click etc. are callable. Best-effort —
+      // an agent without browser access still has all task tooling.
+      try {
+        await registerBrowserMcpForAgent(project_slug, agentId);
+      } catch (err) {
+        console.warn(
+          `[provision] browser MCP registration failed for ${agentId}:`,
           err,
         );
       }

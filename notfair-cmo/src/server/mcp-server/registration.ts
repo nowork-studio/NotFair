@@ -20,13 +20,24 @@ import type { HarnessAdapterId } from "@/server/adapters/types";
  */
 
 export const ORCHESTRATION_MCP_KEY = "notfair-orchestration";
+export const BROWSER_MCP_KEY = "notfair-browser";
+
+function notfairOriginPort(): string {
+  return process.env.NOTFAIR_CMO_PORT?.trim() || "3326";
+}
 
 function defaultMcpUrl(): string {
   if (process.env.NOTFAIR_CMO_MCP_URL?.trim()) {
     return process.env.NOTFAIR_CMO_MCP_URL.trim();
   }
-  const port = process.env.NOTFAIR_CMO_PORT?.trim() || "3326";
-  return `http://127.0.0.1:${port}/api/mcp/orchestration`;
+  return `http://127.0.0.1:${notfairOriginPort()}/api/mcp/orchestration`;
+}
+
+function defaultBrowserMcpUrl(): string {
+  if (process.env.NOTFAIR_CMO_BROWSER_MCP_URL?.trim()) {
+    return process.env.NOTFAIR_CMO_BROWSER_MCP_URL.trim();
+  }
+  return `http://127.0.0.1:${notfairOriginPort()}/api/mcp/browser`;
 }
 
 /**
@@ -70,16 +81,47 @@ export async function registerOrchestrationForAgent(
   project_slug: string,
   agent_id: string,
 ): Promise<InstallResult> {
-  const url = defaultMcpUrl();
+  return registerInternalMcpForAgent({
+    project_slug,
+    agent_id,
+    key: ORCHESTRATION_MCP_KEY,
+    url: defaultMcpUrl(),
+  });
+}
+
+/**
+ * Register the standalone browser MCP (notfair-browser) for an agent.
+ * Same shared-secret auth + same harness adapter glue as orchestration;
+ * separate URL + server name so agents see the surface as its own thing.
+ */
+export async function registerBrowserMcpForAgent(
+  project_slug: string,
+  agent_id: string,
+): Promise<InstallResult> {
+  return registerInternalMcpForAgent({
+    project_slug,
+    agent_id,
+    key: BROWSER_MCP_KEY,
+    url: defaultBrowserMcpUrl(),
+  });
+}
+
+async function registerInternalMcpForAgent(args: {
+  project_slug: string;
+  agent_id: string;
+  key: string;
+  url: string;
+}): Promise<InstallResult> {
+  const { project_slug, agent_id, key, url } = args;
   const project = getProject(project_slug);
   if (!project) {
-    return { ok: false, key: ORCHESTRATION_MCP_KEY, url, error: `Unknown project ${project_slug}` };
+    return { ok: false, key, url, error: `Unknown project ${project_slug}` };
   }
   try {
     const adapter = requireAdapter(project.harness_adapter);
     await maybePruneCodexOrphans(adapter.id);
     await adapter.registerMcp({
-      serverName: ORCHESTRATION_MCP_KEY,
+      serverName: key,
       agentId: agent_id,
       projectSlug: project_slug,
       transport: {
@@ -88,11 +130,11 @@ export async function registerOrchestrationForAgent(
         headers: { Authorization: `Bearer ${getOrCreateMcpServerSecret()}` },
       },
     });
-    return { ok: true, key: ORCHESTRATION_MCP_KEY, url };
+    return { ok: true, key, url };
   } catch (err) {
     return {
       ok: false,
-      key: ORCHESTRATION_MCP_KEY,
+      key,
       url,
       error: err instanceof Error ? err.message : String(err),
     };

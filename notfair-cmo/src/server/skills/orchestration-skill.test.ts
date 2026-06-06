@@ -86,6 +86,12 @@ describe("ORCHESTRATION_SKILL", () => {
     expect(s).not.toContain("<propose_cron>");
   });
 
+  it("points agents at the standalone notfair-browser MCP (not the orchestration MCP)", () => {
+    const s = getOrchestrationSkill();
+    expect(s).toMatch(/notfair-browser MCP/);
+    expect(s).not.toMatch(/notfair-orchestration MCP exposes .*browser_/);
+  });
+
   it("teaches the workspace browser tool inventory", () => {
     const s = getOrchestrationSkill();
     for (const tool of [

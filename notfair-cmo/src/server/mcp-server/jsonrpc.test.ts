@@ -32,13 +32,20 @@ vi.mock("@/server/db/agent-actions", () => ({
 }));
 
 import { handleJsonRpc, type JsonRpcRequest } from "./jsonrpc";
+import { TOOLS } from "./tools";
+
+const ORCHESTRATION_SERVER = {
+  name: "notfair-orchestration",
+  version: "0.2.0",
+  tools: TOOLS,
+};
 
 beforeEach(() => {
   vi.clearAllMocks();
 });
 
 function call(req: JsonRpcRequest) {
-  return handleJsonRpc(req);
+  return handleJsonRpc(req, ORCHESTRATION_SERVER);
 }
 
 describe("handleJsonRpc — initialize", () => {
@@ -52,7 +59,7 @@ describe("handleJsonRpc — initialize", () => {
       capabilities: { tools: object };
     };
     expect(result.protocolVersion).toMatch(/^\d{4}-\d{2}-\d{2}$/);
-    expect(result.serverInfo.name).toBe("notfair-cmo");
+    expect(result.serverInfo.name).toBe("notfair-orchestration");
     expect(result.capabilities.tools).toEqual({});
   });
 

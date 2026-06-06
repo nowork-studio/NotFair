@@ -99,7 +99,7 @@ across restarts; you do not need to ask the user to sign in again.
 
 ### CRITICAL: which "browser" tool to use
 
-The notfair-orchestration MCP exposes \`browser_open\`, \`browser_snapshot\`,
+The notfair-browser MCP exposes \`browser_open\`, \`browser_snapshot\`,
 \`browser_click\`, etc. **These are the ONLY tools that touch the workspace
 browser.** When the user says "launch the browser", "open a page", "go to
 <URL>", "snapshot the page", or anything in that family, the answer is

@@ -1,7 +1,13 @@
-import { describeTool, findTool, TOOLS } from "./tools";
+import { describeTool, type ToolDefinition } from "./tools";
 
 /**
- * JSON-RPC 2.0 dispatcher for notfair-cmo's outbound MCP server.
+ * JSON-RPC 2.0 dispatcher for notfair-cmo's outbound MCP servers.
+ *
+ * Each MCP server endpoint (e.g. /api/mcp/orchestration, /api/mcp/browser)
+ * passes its own tool registry to `handleJsonRpc`. Splitting the surface
+ * into multiple servers keeps related tools grouped, lets users
+ * enable/disable per-MCP, and makes "what is this MCP for?" obvious from
+ * the server name alone.
  *
  * MCP methods we implement:
  *   - initialize: handshake; reports protocol version + server info
@@ -36,8 +42,18 @@ export type JsonRpcResponse =
 
 const PROTOCOL_VERSION = "2025-06-18";
 
+export interface McpServerInfo {
+  /** Server name reported in `initialize`. Should match the MCP registration key (e.g. "notfair-orchestration"). */
+  name: string;
+  /** Server version string. Bump when wire-visible behavior changes. */
+  version: string;
+  /** Tool registry for this server. */
+  tools: ReadonlyArray<ToolDefinition>;
+}
+
 export async function handleJsonRpc(
   req: JsonRpcRequest,
+  server: McpServerInfo,
 ): Promise<JsonRpcResponse | null> {
   // Notifications (no id): handle the side-effecting ones but never reply.
   if (req.id === undefined || req.id === null) {
@@ -50,13 +66,13 @@ export async function handleJsonRpc(
       case "initialize":
         return ok(id, {
           protocolVersion: PROTOCOL_VERSION,
-          serverInfo: { name: "notfair-cmo", version: "0.1.0" },
+          serverInfo: { name: server.name, version: server.version },
           capabilities: { tools: {} },
         });
       case "tools/list":
-        return ok(id, { tools: TOOLS.map(describeTool) });
+        return ok(id, { tools: server.tools.map(describeTool) });
       case "tools/call":
-        return await handleToolsCall(id, req.params ?? {});
+        return await handleToolsCall(id, req.params ?? {}, server.tools);
       case "ping":
         return ok(id, {});
       default:
@@ -74,13 +90,14 @@ export async function handleJsonRpc(
 async function handleToolsCall(
   id: string | number,
   params: Record<string, unknown>,
+  tools: ReadonlyArray<ToolDefinition>,
 ): Promise<JsonRpcResponse> {
   const name = params.name;
   const args = params.arguments ?? {};
   if (typeof name !== "string") {
     return err(id, -32602, "Invalid params: 'name' must be a string");
   }
-  const tool = findTool(name);
+  const tool = tools.find((t) => t.name === name);
   if (!tool) {
     return err(id, -32601, `Unknown tool: ${name}`);
   }
