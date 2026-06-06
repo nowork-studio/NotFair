@@ -58,10 +58,10 @@ function makeFakeBrowser(): { browser: Browser; context: BrowserContext; closed:
 beforeEach(() => {
   process.env.NOTFAIR_CMO_DATA_DIR = "/tmp/notfair-cmo-test";
   process.env.NOTFAIR_CHROME_PATH = "/usr/bin/fake-chrome";
-  // Disable the idle ticker globally so tests that don't exercise it
-  // never get surprise shutdowns mid-assertion.
-  process.env.NOTFAIR_BROWSER_IDLE_DISABLED = "1";
   _sessionsByProject.clear();
+  // Cancel any leftover ticker so cross-test interactions are deterministic.
+  // The ticker fires every 30s; test durations are <1s, so we're not racing
+  // mid-test, but we still keep the slate clean.
   _stopIdleChecker();
 });
 
@@ -70,7 +70,6 @@ afterEach(async () => {
   _stopIdleChecker();
   delete process.env.NOTFAIR_CMO_DATA_DIR;
   delete process.env.NOTFAIR_CHROME_PATH;
-  delete process.env.NOTFAIR_BROWSER_IDLE_DISABLED;
   delete process.env.NOTFAIR_BROWSER_IDLE_TIMEOUT_MS;
 });
 

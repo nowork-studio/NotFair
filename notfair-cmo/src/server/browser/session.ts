@@ -14,8 +14,7 @@
  *      cached session so the next browser_open relaunches.
  *   4. Idle auto-shutdown: a 30s tick checks for sessions with no
  *      activity (no getOrLaunchBrowser call) in the last
- *      NOTFAIR_BROWSER_IDLE_TIMEOUT_MS (default 5 minutes). Disable
- *      with NOTFAIR_BROWSER_IDLE_DISABLED=1.
+ *      NOTFAIR_BROWSER_IDLE_TIMEOUT_MS (default 5 minutes).
  */
 import type { Browser, BrowserContext } from "playwright-core";
 
@@ -255,13 +254,10 @@ let _idleCheckerInterval: ReturnType<typeof setInterval> | null = null;
  * Start the periodic idle check. Idempotent — call freely. The Node
  * interval is .unref'd so it never keeps the process alive on its own.
  *
- * Disable with NOTFAIR_BROWSER_IDLE_DISABLED=1 (useful for tests that
- * want manual control, or for users who want Chrome to stay warm
- * indefinitely).
+ * Tests cancel via _stopIdleChecker() in afterEach.
  */
 export function ensureIdleChecker(): void {
   if (_idleCheckerInterval) return;
-  if (process.env.NOTFAIR_BROWSER_IDLE_DISABLED === "1") return;
   _idleCheckerInterval = setInterval(() => {
     void checkIdleSessions();
   }, IDLE_CHECK_INTERVAL_MS);
