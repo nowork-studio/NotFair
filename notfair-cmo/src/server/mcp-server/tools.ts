@@ -26,6 +26,8 @@ import {
 } from "@/server/orchestration/handlers";
 import type { TaskStatus } from "@/types";
 
+import { BROWSER_TOOLS } from "./browser-tools";
+
 /**
  * Tool definitions exposed by notfair-cmo's MCP server to OpenClaw-side
  * agents. The MCP server is **globally installed** (one OpenClaw row,
@@ -845,6 +847,7 @@ export const TOOLS: ToolDefinition[] = [
     inputSchema: scheduleRecurringWorkInput,
     handler: handleScheduleRecurringWorkTool,
   },
+  ...BROWSER_TOOLS,
 ];
 
 export function describeTool(tool: ToolDefinition): {
