@@ -41,13 +41,15 @@ describe("WorkspaceBrowserCard", () => {
     expect(screen.getByText(/Profile dir:/)).toBeInTheDocument();
   });
 
-  it("shows running state, sign-in buttons, and open tabs when session is up", async () => {
+  it("shows running state, idle countdown, sign-in buttons, and open tabs when session is up", async () => {
     mockFetch(() => ({
       status: {
         running: true,
         cdpPort: 19042,
         userDataDir: "/tmp/profile",
         uptimeMs: 32_000,
+        idleMs: 60_000,
+        idleTimeoutMs: 300_000,
       },
       tabs: [
         { id: "greg", url: "https://greg.example/", title: "Greg" },
@@ -59,6 +61,8 @@ describe("WorkspaceBrowserCard", () => {
 
     await waitFor(() => expect(screen.getByText(/Running on port 19042/)).toBeInTheDocument());
     expect(screen.getByText(/32s uptime/)).toBeInTheDocument();
+    // 300_000 - 60_000 = 240_000ms → "auto-stops in 240s if idle"
+    expect(screen.getByText(/auto-stops in 240s if idle/)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /Open Google/ })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /Open Meta/ })).toBeInTheDocument();
     expect(screen.getByText("greg")).toBeInTheDocument();

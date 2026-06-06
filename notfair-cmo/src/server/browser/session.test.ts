@@ -5,6 +5,8 @@ import type { ChromeLaunchOptions, LaunchedChrome } from "./chrome";
 import type { Browser, BrowserContext } from "playwright-core";
 import {
   _sessionsByProject,
+  _stopIdleChecker,
+  checkIdleSessions,
   getOrLaunchBrowser,
   getSessionStatus,
   stopAllBrowsers,
@@ -56,13 +58,20 @@ function makeFakeBrowser(): { browser: Browser; context: BrowserContext; closed:
 beforeEach(() => {
   process.env.NOTFAIR_CMO_DATA_DIR = "/tmp/notfair-cmo-test";
   process.env.NOTFAIR_CHROME_PATH = "/usr/bin/fake-chrome";
+  // Disable the idle ticker globally so tests that don't exercise it
+  // never get surprise shutdowns mid-assertion.
+  process.env.NOTFAIR_BROWSER_IDLE_DISABLED = "1";
   _sessionsByProject.clear();
+  _stopIdleChecker();
 });
 
 afterEach(async () => {
   await stopAllBrowsers();
+  _stopIdleChecker();
   delete process.env.NOTFAIR_CMO_DATA_DIR;
   delete process.env.NOTFAIR_CHROME_PATH;
+  delete process.env.NOTFAIR_BROWSER_IDLE_DISABLED;
+  delete process.env.NOTFAIR_BROWSER_IDLE_TIMEOUT_MS;
 });
 
 // ── Tests ────────────────────────────────────────────────────────────────
@@ -221,5 +230,84 @@ describe("getSessionStatus", () => {
     expect(status.running).toBe(true);
     expect(status.launchedAt).toBeTypeOf("number");
     expect(status.uptimeMs).toBeGreaterThanOrEqual(0);
+    expect(status.idleMs).toBeGreaterThanOrEqual(0);
+    expect(status.idleTimeoutMs).toBe(5 * 60 * 1000);
+  });
+
+  it("reflects NOTFAIR_BROWSER_IDLE_TIMEOUT_MS in idleTimeoutMs", () => {
+    process.env.NOTFAIR_BROWSER_IDLE_TIMEOUT_MS = "90000";
+    const status = getSessionStatus("brand-new");
+    expect(status.idleTimeoutMs).toBe(90_000);
+  });
+
+  it("falls back to the default when the env value is non-numeric or non-positive", () => {
+    process.env.NOTFAIR_BROWSER_IDLE_TIMEOUT_MS = "garbage";
+    expect(getSessionStatus("a").idleTimeoutMs).toBe(5 * 60 * 1000);
+    process.env.NOTFAIR_BROWSER_IDLE_TIMEOUT_MS = "0";
+    expect(getSessionStatus("a").idleTimeoutMs).toBe(5 * 60 * 1000);
+  });
+});
+
+// ── Idle auto-shutdown ───────────────────────────────────────────────────
+
+describe("checkIdleSessions", () => {
+  it("stops sessions whose lastActivityAt exceeds the timeout", async () => {
+    process.env.NOTFAIR_BROWSER_IDLE_TIMEOUT_MS = "1000";
+    const launch = vi.fn(async () => makeLaunched(19042));
+    const fake = makeFakeBrowser();
+    const connectOverCDP = vi.fn(async () => fake.browser);
+
+    const session = await getOrLaunchBrowser("acme", { launch, connectOverCDP });
+    // Backdate the lastActivityAt to make this session "idle".
+    session.lastActivityAt = Date.now() - 5_000;
+
+    const stopped = await checkIdleSessions();
+    expect(stopped).toEqual(["acme"]);
+    expect(_sessionsByProject.has("acme")).toBe(false);
+  });
+
+  it("leaves recently-active sessions running", async () => {
+    process.env.NOTFAIR_BROWSER_IDLE_TIMEOUT_MS = "60000";
+    const launch = vi.fn(async () => makeLaunched(19042));
+    const fake = makeFakeBrowser();
+    const connectOverCDP = vi.fn(async () => fake.browser);
+
+    await getOrLaunchBrowser("acme", { launch, connectOverCDP });
+    const stopped = await checkIdleSessions();
+    expect(stopped).toEqual([]);
+    expect(_sessionsByProject.has("acme")).toBe(true);
+  });
+
+  it("getOrLaunchBrowser bumps lastActivityAt on cache hit (touches the session)", async () => {
+    process.env.NOTFAIR_BROWSER_IDLE_TIMEOUT_MS = "1000";
+    const launch = vi.fn(async () => makeLaunched(19042));
+    const fake = makeFakeBrowser();
+    const connectOverCDP = vi.fn(async () => fake.browser);
+
+    const session = await getOrLaunchBrowser("acme", { launch, connectOverCDP });
+    session.lastActivityAt = Date.now() - 10_000; // would-be idle
+
+    await getOrLaunchBrowser("acme", { launch, connectOverCDP });
+    // After the second call, the touch should have moved lastActivityAt forward.
+    expect(Date.now() - session.lastActivityAt).toBeLessThan(500);
+
+    // Idle check now leaves it alone.
+    const stopped = await checkIdleSessions();
+    expect(stopped).toEqual([]);
+  });
+
+  it("can shut down multiple idle projects in one tick", async () => {
+    process.env.NOTFAIR_BROWSER_IDLE_TIMEOUT_MS = "1000";
+    const launch = vi.fn(async () => makeLaunched(19042));
+    const fake = makeFakeBrowser();
+    const connectOverCDP = vi.fn(async () => fake.browser);
+
+    const a = await getOrLaunchBrowser("acme", { launch, connectOverCDP });
+    const b = await getOrLaunchBrowser("beta", { launch, connectOverCDP });
+    a.lastActivityAt = Date.now() - 5_000;
+    b.lastActivityAt = Date.now() - 5_000;
+
+    const stopped = await checkIdleSessions();
+    expect(stopped.sort()).toEqual(["acme", "beta"]);
   });
 });

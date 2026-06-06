@@ -1,10 +1,6 @@
 import { NextResponse } from "next/server";
 
-import {
-  getOrLaunchBrowser,
-  getSessionStatus,
-  registerShutdownHooks,
-} from "@/server/browser/session";
+import { getOrLaunchBrowser, getSessionStatus } from "@/server/browser/session";
 import { openTab } from "@/server/browser/tabs";
 
 export const dynamic = "force-dynamic";
@@ -37,7 +33,8 @@ export async function POST(req: Request) {
   }
 
   try {
-    registerShutdownHooks();
+    // Shutdown hooks + idle checker are auto-registered inside
+    // getOrLaunchBrowser, so this route does not need explicit setup.
     await getOrLaunchBrowser(body.project_slug, { headless: body.headless ?? false });
     const status = getSessionStatus(body.project_slug);
 

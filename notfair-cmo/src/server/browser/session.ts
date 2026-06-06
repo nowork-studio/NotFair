@@ -2,15 +2,20 @@
  * Workspace-scoped Chrome session lifecycle.
  *
  * One Chrome process per project, lazily launched the first time a browser
- * tool runs for that project, reused for the remainder of the notfair-cmo
- * process lifetime. Chrome's user-data-dir lock prevents a second concurrent
- * instance, so all agents within a workspace share the same Chrome and
- * coordinate via labeled tabs (see tabs.ts).
+ * tool runs for that project. Chrome's user-data-dir lock prevents a second
+ * concurrent instance, so all agents within a workspace share the same
+ * Chrome and coordinate via labeled tabs (see tabs.ts).
  *
- * We deliberately do NOT auto-shutdown on idle in V1. Keeping Chrome warm
- * preserves cookies (no extra disk writes) and avoids the 1-2s relaunch
- * cost on every agent turn. Process-exit handlers in registerShutdownHooks()
- * make sure we don't leak Chrome processes when notfair-cmo stops.
+ * Shutdown happens four ways:
+ *   1. User clicks Settings → Workspace browser → Stop (manual).
+ *   2. notfair-cmo process exits — SIGINT/SIGTERM/beforeExit handlers
+ *      registered automatically on the first launch.
+ *   3. User Cmd-Q's the Chrome window — process exit event evicts the
+ *      cached session so the next browser_open relaunches.
+ *   4. Idle auto-shutdown: a 30s tick checks for sessions with no
+ *      activity (no getOrLaunchBrowser call) in the last
+ *      NOTFAIR_BROWSER_IDLE_TIMEOUT_MS (default 5 minutes). Disable
+ *      with NOTFAIR_BROWSER_IDLE_DISABLED=1.
  */
 import type { Browser, BrowserContext } from "playwright-core";
 
@@ -36,7 +41,12 @@ export interface BrowserSession {
   context: BrowserContext;
   /** Wall-clock launch time, for diagnostics. */
   launchedAt: number;
+  /** Wall-clock of the most recent getOrLaunchBrowser call. Drives idle timeout. */
+  lastActivityAt: number;
 }
+
+const DEFAULT_IDLE_TIMEOUT_MS = 5 * 60 * 1000;
+const IDLE_CHECK_INTERVAL_MS = 30_000;
 
 /**
  * Per-process registry of running browser sessions, keyed by project slug.
@@ -74,8 +84,15 @@ export async function getOrLaunchBrowser(
   projectSlug: string,
   opts: GetOrLaunchOptions = {},
 ): Promise<BrowserSession> {
+  // Every entry point goes through here, so this is also the right place
+  // to install our process-lifetime maintenance: shutdown hooks (cleanup on
+  // notfair-cmo exit) + idle checker (stop unused browsers).
+  registerShutdownHooks();
+  ensureIdleChecker();
+
   const existing = _sessionsByProject.get(projectSlug);
   if (existing && isSessionAlive(existing)) {
+    existing.lastActivityAt = Date.now();
     return existing;
   }
   if (existing) {
@@ -147,6 +164,7 @@ async function launchSession(
     browser,
     context,
     launchedAt: Date.now(),
+    lastActivityAt: Date.now(),
   };
   _sessionsByProject.set(projectSlug, session);
 
@@ -206,6 +224,8 @@ let _shutdownHooksInstalled = false;
 /**
  * Register SIGINT/SIGTERM/beforeExit handlers that stop every browser
  * session. Idempotent — safe to call from multiple call sites.
+ * Auto-invoked from getOrLaunchBrowser so cron-triggered launches are
+ * covered too, not just UI launches via /api/browser/launch.
  */
 export function registerShutdownHooks(): void {
   if (_shutdownHooksInstalled) return;
@@ -219,6 +239,59 @@ export function registerShutdownHooks(): void {
   process.once("beforeExit", handler);
 }
 
+// ── Idle auto-shutdown ──────────────────────────────────────────────────
+
+function resolveIdleTimeoutMs(): number {
+  const raw = process.env.NOTFAIR_BROWSER_IDLE_TIMEOUT_MS?.trim();
+  if (!raw) return DEFAULT_IDLE_TIMEOUT_MS;
+  const n = Number(raw);
+  if (!Number.isFinite(n) || n <= 0) return DEFAULT_IDLE_TIMEOUT_MS;
+  return n;
+}
+
+let _idleCheckerInterval: ReturnType<typeof setInterval> | null = null;
+
+/**
+ * Start the periodic idle check. Idempotent — call freely. The Node
+ * interval is .unref'd so it never keeps the process alive on its own.
+ *
+ * Disable with NOTFAIR_BROWSER_IDLE_DISABLED=1 (useful for tests that
+ * want manual control, or for users who want Chrome to stay warm
+ * indefinitely).
+ */
+export function ensureIdleChecker(): void {
+  if (_idleCheckerInterval) return;
+  if (process.env.NOTFAIR_BROWSER_IDLE_DISABLED === "1") return;
+  _idleCheckerInterval = setInterval(() => {
+    void checkIdleSessions();
+  }, IDLE_CHECK_INTERVAL_MS);
+  _idleCheckerInterval.unref?.();
+}
+
+/**
+ * Find sessions with no getOrLaunchBrowser call inside the idle window
+ * and stop them. Exported for tests; production code calls via the timer.
+ */
+export async function checkIdleSessions(now: number = Date.now()): Promise<string[]> {
+  const idleTimeoutMs = resolveIdleTimeoutMs();
+  const slugsToStop: string[] = [];
+  for (const [slug, session] of _sessionsByProject) {
+    if (now - session.lastActivityAt >= idleTimeoutMs) {
+      slugsToStop.push(slug);
+    }
+  }
+  await Promise.all(slugsToStop.map((slug) => stopBrowser(slug)));
+  return slugsToStop;
+}
+
+/** Test-only: cancel the periodic checker. */
+export function _stopIdleChecker(): void {
+  if (_idleCheckerInterval) {
+    clearInterval(_idleCheckerInterval);
+    _idleCheckerInterval = null;
+  }
+}
+
 /** Status snapshot for browser_status MCP tool + diagnostics. */
 export interface BrowserSessionStatus {
   projectSlug: string;
@@ -227,14 +300,20 @@ export interface BrowserSessionStatus {
   userDataDir: string;
   launchedAt?: number;
   uptimeMs?: number;
+  /** Milliseconds since the last getOrLaunchBrowser call — what the idle
+   *  shutdown timer compares against. */
+  idleMs?: number;
+  /** The current idle-shutdown threshold (env-overridable). */
+  idleTimeoutMs: number;
 }
 
 export function getSessionStatus(projectSlug: string): BrowserSessionStatus {
   const session = _sessionsByProject.get(projectSlug);
   const cdpPort = allocateCdpPort(projectSlug);
   const userDataDir = resolveUserDataDir(projectSlug);
+  const idleTimeoutMs = resolveIdleTimeoutMs();
   if (!session) {
-    return { projectSlug, running: false, cdpPort, userDataDir };
+    return { projectSlug, running: false, cdpPort, userDataDir, idleTimeoutMs };
   }
   return {
     projectSlug,
@@ -243,5 +322,7 @@ export function getSessionStatus(projectSlug: string): BrowserSessionStatus {
     userDataDir: session.userDataDir,
     launchedAt: session.launchedAt,
     uptimeMs: Date.now() - session.launchedAt,
+    idleMs: Date.now() - session.lastActivityAt,
+    idleTimeoutMs,
   };
 }

@@ -11,9 +11,24 @@ type Status = {
   cdpPort: number;
   userDataDir: string;
   uptimeMs?: number;
+  idleMs?: number;
+  idleTimeoutMs: number;
 };
 
 type Tab = { id: string; url: string; title: string };
+
+function formatRunningStatus(status: Status): string {
+  const parts = [`Running on port ${status.cdpPort}`];
+  if (status.uptimeMs) parts.push(`${Math.round(status.uptimeMs / 1000)}s uptime`);
+  if (status.idleMs !== undefined) {
+    const remainingSec = Math.max(
+      0,
+      Math.round((status.idleTimeoutMs - status.idleMs) / 1000),
+    );
+    parts.push(`auto-stops in ${remainingSec}s if idle`);
+  }
+  return parts.join(" · ");
+}
 
 const SIGNIN_TARGETS: Array<{ label: string; url: string }> = [
   { label: "Google", url: "https://accounts.google.com/" },
@@ -124,8 +139,7 @@ export function WorkspaceBrowserCard({ projectSlug }: { projectSlug: string }) {
             {loading
               ? "Checking…"
               : status?.running
-                ? `Running on port ${status.cdpPort}` +
-                  (status.uptimeMs ? ` · ${Math.round(status.uptimeMs / 1000)}s uptime` : "")
+                ? formatRunningStatus(status)
                 : "Not running"}
           </span>
 

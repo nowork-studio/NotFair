@@ -8,6 +8,8 @@ vi.mock("@/server/browser/session", () => ({
     userDataDir: "/tmp/profile",
     launchedAt: 1_000,
     uptimeMs: 5_000,
+    idleMs: 2_000,
+    idleTimeoutMs: 300_000,
   })),
 }));
 
@@ -50,6 +52,7 @@ describe("GET /api/browser/status", () => {
       running: false,
       cdpPort: 19042,
       userDataDir: "/tmp/profile",
+      idleTimeoutMs: 300_000,
     });
     const res = await GET(makeReq("?project_slug=acme"));
     const body = await res.json();

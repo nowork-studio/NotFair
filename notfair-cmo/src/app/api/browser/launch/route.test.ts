@@ -9,8 +9,8 @@ vi.mock("@/server/browser/session", () => ({
     userDataDir: "/tmp/profile",
     launchedAt: 1_000,
     uptimeMs: 5_000,
+    idleTimeoutMs: 300_000,
   })),
-  registerShutdownHooks: vi.fn(),
 }));
 
 vi.mock("@/server/browser/tabs", () => ({
@@ -50,7 +50,6 @@ describe("POST /api/browser/launch", () => {
     const body = await res.json();
     expect(body.status.running).toBe(true);
     expect(session.getOrLaunchBrowser).toHaveBeenCalledWith("acme", { headless: false });
-    expect(session.registerShutdownHooks).toHaveBeenCalledOnce();
   });
 
   it("honors headless=true when provided", async () => {
