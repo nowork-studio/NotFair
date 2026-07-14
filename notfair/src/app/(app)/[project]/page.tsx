@@ -10,6 +10,7 @@ import {
   type Goal,
 } from "@/server/db/goals";
 import { listProjectMcpTokens } from "@/server/mcp/tokens";
+import { listPrsAwaitingReview } from "@/server/db/goal-prs";
 import { listOpenSuggestions } from "@/server/db/suggestions";
 import {
   listSuggestionRuns,
@@ -71,7 +72,13 @@ export default async function ProjectGoalsPage({
     }
     return { agent: a, goal, snapshots, delta };
   });
-  const connectedCount = listProjectMcpTokens(slug).length;
+  const connectedMcpKeys = listProjectMcpTokens(slug).map((t) => t.server_name);
+  const connectedCount = connectedMcpKeys.length;
+  // Goals with a PR sitting on the user's side of the net — surfaced as a
+  // badge on the row so review requests are visible from the index.
+  const goalIdsAwaitingPrReview = new Set(
+    listPrsAwaitingReview(slug).map((pr) => pr.goal_id),
+  );
 
   // Account analysis → suggested goals. First index visit after a connect
   // (or after a restart dropped a run) kicks the audit in the background;
@@ -94,7 +101,7 @@ export default async function ProjectGoalsPage({
       </header>
 
       <div className="mb-6">
-        <NewGoalForm projectSlug={slug} />
+        <NewGoalForm projectSlug={slug} connectedMcpKeys={connectedMcpKeys} />
       </div>
 
       {connectedCount === 0 && (
@@ -175,6 +182,9 @@ export default async function ProjectGoalsPage({
                     <span className="ns-row-title-row">
                       <span className="ns-row-title">{goal ? goalLabel(goal) : agent.name}</span>
                       {goal && <span className="ns-tag">{STATUS_LABEL[goal.status]}</span>}
+                      {goal && goalIdsAwaitingPrReview.has(goal.id) && (
+                        <span className="ns-tag-accent">PR needs your review</span>
+                      )}
                     </span>
                     <span className="ns-row-desc block">
                       {goal?.statement?.trim()

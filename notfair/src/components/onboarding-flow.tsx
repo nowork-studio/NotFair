@@ -19,9 +19,10 @@ import {
 } from "@/server/onboarding/accounts";
 import { AddMcpServerMenu } from "@/components/add-mcp-server-card";
 import { McpCard } from "@/components/mcp-card";
+import { NewGoalForm } from "@/components/new-goal-form";
 import type { AccountPickerPrefetch } from "@/components/mcp-account-picker-dialog";
 
-type Step = "name" | "connect";
+type Step = "name" | "connect" | "goal";
 
 /**
  * The post-OAuth account/property choice for a multi-account MCP, as
@@ -37,9 +38,12 @@ type PendingAccountChoice = {
 export function OnboardingFlow({
   pickerMcpKey = null,
   pickerPrefetch = null,
+  connectedMcpKeys = [],
 }: {
   pickerMcpKey?: string | null;
   pickerPrefetch?: AccountPickerPrefetch | null;
+  /** Feeds the first-goal step's focus chips (server-computed). */
+  connectedMcpKeys?: string[];
 }) {
   return (
     <Suspense fallback={null}>
@@ -49,6 +53,7 @@ export function OnboardingFlow({
             ? { mcp_key: pickerMcpKey, prefetch: pickerPrefetch }
             : null
         }
+        connectedMcpKeys={connectedMcpKeys}
       />
     </Suspense>
   );
@@ -56,8 +61,10 @@ export function OnboardingFlow({
 
 function OnboardingFlowInner({
   autoPicker,
+  connectedMcpKeys,
 }: {
   autoPicker: PendingAccountChoice | null;
+  connectedMcpKeys: string[];
 }) {
   const router = useRouter();
   const params = useSearchParams();
@@ -66,8 +73,8 @@ function OnboardingFlowInner({
   const mcpConnected = params.get("mcp_connected") ?? undefined;
   const mcpError = params.get("mcp_error") ?? undefined;
   const mcpAnalyzing = params.get("mcp_analyzing") === "1";
-  const step: Step = stepParam === "connect" ? "connect" : "name";
-  const phase: "name" | "connect" = step;
+  const step: Step =
+    stepParam === "connect" ? "connect" : stepParam === "goal" ? "goal" : "name";
 
   return (
     <div className="ns-page">
@@ -88,12 +95,20 @@ function OnboardingFlowInner({
         <span className="ns-topbar-label">NotFair</span>
         <div className="ml-auto">
           <div className="ns-progress">
-            <Pip n={1} label="Workspace" state={phase === "name" ? "active" : "done"} />
+            <Pip n={1} label="Workspace" state={step === "name" ? "active" : "done"} />
             <span className="ns-pip-line" />
             <Pip
               n={2}
               label="Connect"
-              state={phase === "name" ? "pending" : "active"}
+              state={
+                step === "name" ? "pending" : step === "connect" ? "active" : "done"
+              }
+            />
+            <span className="ns-pip-line" />
+            <Pip
+              n={3}
+              label="First goal"
+              state={step === "goal" ? "active" : "pending"}
             />
           </div>
         </div>
@@ -116,7 +131,10 @@ function OnboardingFlowInner({
         {step === "connect" && slug && (
           <ConnectStep slug={slug} autoPicker={autoPicker} />
         )}
-        {step === "connect" && !slug && <MissingSlug />}
+        {step === "goal" && slug && (
+          <FirstGoalStep slug={slug} connectedMcpKeys={connectedMcpKeys} />
+        )}
+        {step !== "name" && !slug && <MissingSlug />}
       </main>
     </div>
   );
@@ -451,9 +469,15 @@ function ConnectStep({
 
   function onDone() {
     setAdvancing(true);
-    // Straight to the workspace: the user mints their first goal agent
-    // there and defines the goal in its chat. Nothing to provision here.
-    router.replace(projectHref(slug, ""));
+    // With sources connected, the wizard's last step mints the first
+    // goal — focus options derive from what just got connected. With
+    // nothing connected there's nothing measurable to focus on, so the
+    // Skip path drops straight into the workspace.
+    if (view.phase === "loaded" && view.any_connected) {
+      router.push(`/onboarding?step=goal&slug=${encodeURIComponent(slug)}`);
+    } else {
+      router.replace(projectHref(slug, ""));
+    }
   }
 
   if (view.phase === "loading") {
@@ -576,6 +600,46 @@ function ConnectStep({
             Skip
           </button>
         )}
+      </div>
+    </>
+  );
+}
+
+// ── Step 3: First goal ─────────────────────────────────────────────
+//
+// The same statement-first creation form the goals index uses — one
+// component, one experience. Focus chips derive from the platforms the
+// user just connected (SEO for Search Console, Google Ads, …); creating
+// drops them straight into the new agent's chat, already working.
+
+function FirstGoalStep({
+  slug,
+  connectedMcpKeys,
+}: {
+  slug: string;
+  connectedMcpKeys: string[];
+}) {
+  return (
+    <>
+      <header>
+        <h1 className="ns-hero-title">Create your first goal.</h1>
+        <p className="ns-hero-sub">
+          Pick a focus, state the ambition. An agent measures it, shows you
+          the baseline, and waits for your START.
+        </p>
+      </header>
+
+      <div className="mt-5">
+        <NewGoalForm projectSlug={slug} connectedMcpKeys={connectedMcpKeys} />
+      </div>
+
+      <div className="ns-foot">
+        <p className="ns-footnote">
+          Not sure yet? Your workspace has this same form.
+        </p>
+        <Link href={projectHref(slug, "")} className="ns-btn ns-btn-ghost">
+          Skip for now
+        </Link>
       </div>
     </>
   );

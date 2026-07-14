@@ -37,6 +37,8 @@ import { GoalStartButton } from "@/components/goal-start-button";
 import { GoalAutoRefresh } from "@/components/goal-auto-refresh";
 import { GoalProgressChart } from "@/components/goal-progress-chart";
 import { GoalChecksStrip } from "@/components/goal-checks-strip";
+import { listGoalPrs, type GoalPr } from "@/server/db/goal-prs";
+import { maybeSyncGoalPrs } from "@/server/goals/pr-sync";
 import { buildCheckSquares, currentStreak } from "@/lib/goal-streak";
 
 export const dynamic = "force-dynamic";
@@ -112,9 +114,15 @@ export default async function GoalPage({
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
-      {(goal.status === "intake" || goal.status === "active") && (
-        <GoalAutoRefresh intervalMs={8000} />
-      )}
+      {/* Every pre-terminal state before START changes server-side via
+          agent tool calls: intake verifies the metric (→ proposed), and a
+          proposed goal's target lands via propose_target — which is what
+          makes the START button appear. Without polling `proposed`, the
+          user is told "press START" but the button never renders until a
+          manual reload. */}
+      {(goal.status === "intake" ||
+        goal.status === "proposed" ||
+        goal.status === "active") && <GoalAutoRefresh intervalMs={8000} />}
 
       {/* Header: the goal is the title. */}
       <header className="flex items-center gap-3 px-5 py-2.5">
@@ -191,6 +199,11 @@ function GoalRail({
   const allActions = listGoalActions(goal.id, 100);
   const targetMet = isTargetMet(goal);
   const tickRunning = ticks.some((t) => t.status === "running");
+  // PRs the agent opened against the codebase. Kick a background GitHub
+  // sync when rows look stale — the page's auto-refresh poll picks up the
+  // fresh state a moment later without blocking this render.
+  const prs = listGoalPrs(goal.id, 10);
+  if (prs.some((pr) => pr.state === "open")) maybeSyncGoalPrs(goal.id);
 
   // Chart data — plain-JSON props for the client component.
   const chartPoints = snapshots.map((sn) => ({
@@ -364,6 +377,17 @@ function GoalRail({
             </div>
           )}
 
+          {prs.length > 0 && (
+            <div>
+              <RailHeading>Pull requests</RailHeading>
+              <ul className="m-0 flex list-none flex-col gap-2.5 p-0">
+                {prs.map((pr) => (
+                  <PrItem key={pr.id} pr={pr} />
+                ))}
+              </ul>
+            </div>
+          )}
+
           <div>
             <RailHeading>Checks</RailHeading>
             {ticks.length === 0 ? (
@@ -431,6 +455,54 @@ function TickItem({
         >
           details ›
         </Link>
+      )}
+    </li>
+  );
+}
+
+function PrItem({ pr }: { pr: GoalPr }) {
+  const needsReview =
+    pr.state === "open" &&
+    !pr.is_draft &&
+    pr.review_decision !== "CHANGES_REQUESTED";
+  return (
+    <li className="text-[12px] leading-snug">
+      <div className="flex items-baseline justify-between gap-2">
+        <a
+          href={pr.url}
+          target="_blank"
+          rel="noreferrer"
+          className="ns-link min-w-0 truncate font-medium"
+        >
+          {pr.title}
+        </a>
+        <span className="shrink-0 text-[10.5px] tabular-nums text-[hsl(var(--notfair-ink-4))]">
+          {timeAgo(pr.created_at)}
+        </span>
+      </div>
+      <p className="m-0 mt-0.5 flex flex-wrap items-center gap-1.5">
+        {pr.state === "merged" ? (
+          <span className="ns-tag">merged</span>
+        ) : pr.state === "closed" ? (
+          <span className="ns-tag-red">closed unmerged</span>
+        ) : pr.is_draft ? (
+          <span className="ns-tag">draft</span>
+        ) : pr.review_decision === "CHANGES_REQUESTED" ? (
+          <span className="ns-tag-amber">changes requested — agent's turn</span>
+        ) : (
+          <span className="ns-tag-accent">needs your review</span>
+        )}
+        {pr.comment_count > 0 && (
+          <span className="text-[11px] text-[hsl(var(--notfair-ink-4))]">
+            {pr.comment_count} comment{pr.comment_count === 1 ? "" : "s"}
+          </span>
+        )}
+        {pr.branch && <span className="ns-tag-mono">{pr.branch}</span>}
+      </p>
+      {pr.sync_error && (
+        <p className="m-0 mt-0.5 text-[11px] text-[hsl(var(--notfair-warn))]">
+          sync failed: {pr.sync_error}
+        </p>
       )}
     </li>
   );

@@ -16,12 +16,15 @@ export function buildIntakeKickoffMessage(input: {
   goal: Goal;
   connectedMcpKeys: string[];
   hasSharedContext: boolean;
+  /** Platform focus the user picked at creation ("SEO / organic search —
+   *  measure via the notfair-googlesearchconsole MCP"). Optional. */
+  focus?: string | null;
 }): string {
-  const { goal, connectedMcpKeys, hasSharedContext } = input;
+  const { goal, connectedMcpKeys, hasSharedContext, focus } = input;
   return `[INTAKE] The user just created you for this ambition:
 
 > ${goal.statement}
-
+${focus ? `\nThe user tagged this goal's focus: ${focus}. Explore and measure on that platform unless the statement clearly says otherwise.\n` : ""}
 Connected data sources: ${
     connectedMcpKeys.length > 0
       ? connectedMcpKeys.join(", ")
@@ -39,7 +42,10 @@ you record their agreement via propose_target).`;
 
 /** Fire-and-forget from goal creation. The goal screen's embedded chat
  *  streams it live — one conversation per goal, on the "main" session. */
-export async function runGoalIntake(goal: Goal): Promise<void> {
+export async function runGoalIntake(
+  goal: Goal,
+  opts?: { focus?: string | null },
+): Promise<void> {
   const project = getProject(goal.project_slug);
   if (!project) {
     console.error(`[goal-intake] project not found: ${goal.project_slug}`);
@@ -53,6 +59,7 @@ export async function runGoalIntake(goal: Goal): Promise<void> {
     goal,
     connectedMcpKeys,
     hasSharedContext: Boolean(brief?.trim()),
+    focus: opts?.focus,
   });
   try {
     await streamAgentTurn({

@@ -29,6 +29,8 @@ import {
   type GoalTick,
   type GoalTickTrigger,
 } from "@/server/db/goals";
+import { listGoalPrs, type GoalPr } from "@/server/db/goal-prs";
+import { syncGoalPrs } from "./pr-sync";
 import { measureGoalMetric, type MetricMeasurement } from "./metric";
 
 /**
@@ -59,12 +61,36 @@ export type TickContext = {
   loggedSpendUsd: number;
   recentLearnings: GoalLearning[];
   lastTick: GoalTick | null;
+  /** PRs this goal opened against the codebase, freshly synced from GitHub. */
+  pullRequests: GoalPr[];
   /** Extra leading section, e.g. an approval decision on wake-up. */
   extraContext?: string;
 };
 
 function fmtValue(v: number | null): string {
   return v === null ? "—" : String(v);
+}
+
+/** One line of live PR state for the tick brief. */
+export function describePrForBrief(pr: GoalPr): string {
+  const bits: string[] = [`[${pr.state.toUpperCase()}]`];
+  if (pr.state === "open") {
+    if (pr.is_draft) bits.push("(draft)");
+    if (pr.review_decision === "CHANGES_REQUESTED") {
+      bits.push("CHANGES REQUESTED by the user");
+    } else if (pr.review_decision === "APPROVED") {
+      bits.push("approved, awaiting merge");
+    } else {
+      bits.push("awaiting the user's review");
+    }
+    if (pr.comment_count > 0) bits.push(`${pr.comment_count} comment(s)/review(s)`);
+  } else if (pr.state === "merged") {
+    bits.push(`merged ${pr.merged_at ?? ""}`.trim());
+  } else {
+    bits.push("closed WITHOUT merge");
+  }
+  if (pr.sync_error) bits.push(`(last sync failed: ${pr.sync_error})`);
+  return `${pr.title} — ${pr.url} — ${bits.join(", ")}${pr.action_id ? ` — linked action ${pr.action_id}` : ""}`;
 }
 
 function daysUntil(deadline: string, nowIso: string): number {
@@ -171,6 +197,17 @@ export function buildTickMessage(ctx: TickContext): string {
     lines.push("");
   }
 
+  if (ctx.pullRequests.length > 0) {
+    lines.push("## Your pull requests (state synced from GitHub just now)");
+    for (const pr of ctx.pullRequests.slice(0, 6)) {
+      lines.push(`- ${describePrForBrief(pr)}`);
+    }
+    lines.push(
+      "- PR rules: the user merges, never you. CHANGES_REQUESTED → address the review comments this tick and push to the same branch. Open + unreviewed → nudge the user in your diary, don't duplicate the work. Merged → the change is live; its observation window runs from the merge. Closed unmerged → treat as rejected: review the linked action with that outcome and learn from it.",
+    );
+    lines.push("");
+  }
+
   lines.push("## Recent learnings");
   if (ctx.recentLearnings.length === 0) {
     lines.push("- none yet — use search_learnings for older ones once they exist");
@@ -238,11 +275,13 @@ async function runGoalTickInner(
   const tickNumber = markGoalTicked(goal.id);
   const nowIso = new Date().toISOString();
 
-  // Ground truth first: the platform measures, not the agent.
+  // Ground truth first: the platform measures, not the agent — and PR
+  // state comes from GitHub, not from what the agent remembers.
   const measurement = await measureGoalMetric(goal);
   if (measurement.ok) {
     recordMetricSnapshot(goal.id, measurement.value, "tick");
   }
+  await syncGoalPrs(goal.id);
   const freshGoal = getGoal(goal.id)!;
 
   const tick = createGoalTick({
@@ -266,6 +305,7 @@ async function runGoalTickInner(
     loggedSpendUsd: loggedSpendTotal(goal.id),
     recentLearnings: listGoalLearnings(goal.id, 8),
     lastTick: getLastFinishedTick(goal.id),
+    pullRequests: listGoalPrs(goal.id, 6),
     extraContext: opts.extraContext,
   });
 
@@ -300,6 +340,9 @@ function smartSleep(goalId: string): void {
   if (!goal || goal.status !== "active" || !goal.next_tick_at) return;
   const nowIso = new Date().toISOString();
   if (listActionsDueForReview(goal.id, nowIso).length > 0) return;
+  // An open PR means external state can flip any day (review comments,
+  // merge) and the agent must react on cadence — never oversleep it.
+  if (listGoalPrs(goal.id, 10).some((pr) => pr.state === "open")) return;
   const gated = listGatedActions(goal.id, nowIso);
   if (gated.length === 0) return;
   const earliestReview = gated

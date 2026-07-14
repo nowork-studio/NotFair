@@ -623,3 +623,73 @@ function syncIdentity(goal: Goal): Promise<void> {
     .then(({ syncGoalIdentity }) => syncGoalIdentity(goal))
     .catch((err) => console.warn("[goal-handlers] identity sync failed:", err));
 }
+
+// ── register_pull_request ───────────────────────────────────────────────
+
+export type RegisterPullRequestInput = {
+  goal_id: string;
+  url: string;
+  title: string;
+  branch?: string;
+  action_id?: string;
+};
+
+const GITHUB_PR_URL = /^https:\/\/github\.com\/[^/\s]+\/[^/\s]+\/pull\/\d+$/;
+
+/**
+ * Record a pull request the agent just opened against the workspace's
+ * codebase. The PR is the approval gate for code mutations: the platform
+ * syncs its state from GitHub on every tick and surfaces it to the user
+ * for review — the agent never merges its own PR.
+ */
+export async function handleRegisterPullRequest(
+  input: RegisterPullRequestInput,
+  ctx: HandlerContext,
+): Promise<HandlerResult<{ pr_id: string; state: string }>> {
+  const r = resolveGoal(input.goal_id, ctx, { requireOwner: true });
+  if (!r.ok) return r;
+  const goal = r.data;
+
+  const url = input.url.trim().replace(/\/$/, "");
+  if (!GITHUB_PR_URL.test(url)) {
+    return {
+      ok: false,
+      error:
+        "url must be a GitHub pull-request URL like https://github.com/owner/repo/pull/123.",
+    };
+  }
+  if (input.action_id) {
+    const action = getGoalAction(input.action_id);
+    if (!action || action.goal_id !== goal.id) {
+      return {
+        ok: false,
+        error: `action_id '${input.action_id}' is not an action of this goal.`,
+      };
+    }
+  }
+
+  const { createGoalPr, findGoalPrByUrl } = await import("@/server/db/goal-prs");
+  const existing = findGoalPrByUrl(goal.id, url);
+  const pr =
+    existing ??
+    createGoalPr({
+      goal_id: goal.id,
+      url,
+      title: input.title.trim(),
+      branch: input.branch?.trim() || null,
+      action_id: input.action_id ?? null,
+    });
+
+  // Pull the live state right away so the UI's review callout and the
+  // next tick brief start accurate. Best-effort — a gh hiccup lands on
+  // the row's sync_error, not on this call.
+  const { syncGoalPrs } = await import("./pr-sync");
+  await syncGoalPrs(goal.id);
+  const { getGoalPr } = await import("@/server/db/goal-prs");
+  const fresh = getGoalPr(pr.id) ?? pr;
+
+  return {
+    ok: true,
+    data: { pr_id: fresh.id, state: fresh.state },
+  };
+}

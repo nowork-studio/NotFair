@@ -49,6 +49,13 @@ async function nextGoalNumber(project_slug: string): Promise<number> {
 export async function createGoalAgentAction(input: {
   project_slug: string;
   statement: string;
+  /**
+   * Platform focus picked in the creation form (a `GoalPlatform.focus`
+   * line, e.g. "SEO / organic search — measure via the
+   * notfair-googlesearchconsole MCP"). Threaded into the intake kickoff
+   * only — the statement stays the user's words.
+   */
+  focus?: string | null;
 }): Promise<GoalActionResult> {
   const project = getProject(input.project_slug);
   if (!project) return { ok: false, error: "Project not found." };
@@ -80,7 +87,7 @@ export async function createGoalAgentAction(input: {
 
   // The agent starts working immediately; the goal screen's embedded
   // chat streams it live.
-  void runGoalIntake(goal).catch((err) =>
+  void runGoalIntake(goal, { focus: input.focus }).catch((err) =>
     console.error("[goal-intake] kickoff failed:", err),
   );
 

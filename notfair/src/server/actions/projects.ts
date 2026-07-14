@@ -349,3 +349,47 @@ export async function deleteProjectAction(
     },
   };
 }
+
+/**
+ * Set (or clear) the workspace's local codebase folder — the sanctioned
+ * root for agent code changes (branch + PR protocol). Validates the path
+ * is an existing directory, persists it, and re-renders every goal
+ * agent's identity so the "Codebase" workspace fact updates immediately.
+ */
+export async function setProjectCodebasePathAction(input: {
+  project_slug: string;
+  codebase_path: string;
+}): Promise<{ ok: true; codebase_path: string | null } | { ok: false; error: string }> {
+  const slug = input.project_slug.trim();
+  if (!slug) return { ok: false, error: "Missing project slug." };
+  const raw = input.codebase_path.trim();
+
+  let normalized: string | null = null;
+  if (raw) {
+    const { stat } = await import("node:fs/promises");
+    try {
+      const s = await stat(raw);
+      if (!s.isDirectory()) {
+        return { ok: false, error: `Not a folder: ${raw}` };
+      }
+    } catch {
+      return { ok: false, error: `Folder not found: ${raw}` };
+    }
+    normalized = raw;
+  }
+
+  const { setProjectCodebasePath } = await import("@/server/db/projects");
+  const updated = setProjectCodebasePath(slug, normalized);
+  if (!updated) return { ok: false, error: "Project not found." };
+
+  // Agents carry the codebase path in their identity's workspace facts.
+  try {
+    const { syncProjectAgents } = await import("@/server/goals/provision");
+    await syncProjectAgents(slug);
+  } catch (err) {
+    console.warn("[settings] identity re-render after codebase change failed:", err);
+  }
+
+  revalidatePath("/", "layout");
+  return { ok: true, codebase_path: updated.codebase_path };
+}

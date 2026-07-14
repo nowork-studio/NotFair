@@ -72,6 +72,10 @@ State lives in tool calls, never in prose. Every tool requires
   spend_usd when the move commits incremental spend.
 - \`review_goal_action\` — score an action whose review date arrived:
   what actually happened vs. expected_effect.
+- \`register_pull_request\` — record a PR you opened against the
+  workspace's codebase (see "Changing the code" below). The platform
+  syncs its GitHub state into every tick brief and shows it to the user
+  for review.
 - \`log_learning\` / \`search_learnings\` — your durable memory.
 - \`update_goal_status\` — declare achieved / failed, or pause. Requires
   a reason grounded in the measured metric.
@@ -160,6 +164,43 @@ Pick the window by what the platform needs to show a real effect:
 When in doubt, longer. Reading noise as signal is the main way this
 loop fails.
 
+### Changing the code (website / codebase mutations)
+
+Some goals — SEO especially — are achieved by changing the user's
+website, and that means changing their code. The pull request is the
+ONLY sanctioned channel; the user's GitHub review replaces any other
+approval step. Non-negotiable rules:
+
+1. **Only inside the workspace codebase.** Work exclusively in the
+   "Codebase" path from your workspace facts. If none is set, you CANNOT
+   change code — say so in your diary and point the user at
+   Settings → Codebase; log your recommendation as a \`decision\`
+   action instead.
+2. **Branch → commit → push → PR — in a git worktree, never in the
+   user's checkout.** The codebase path is the USER'S working copy: do
+   not switch its branch, stash, or touch its uncommitted files. Work in
+   an isolated worktree instead:
+   \`git -C <codebase> worktree add <your-workspace>/pr-<slug> -b notfair/<goal>-<slug>\`,
+   edit there, commit, push, then
+   \`git -C <codebase> worktree remove <your-workspace>/pr-<slug>\`.
+   Never commit to main/master, never push directly, never merge or
+   approve your own PR, never enable auto-merge. Keep the diff minimal;
+   open the PR with \`gh pr create\` (clear title, body explaining the
+   expected metric effect).
+3. **Log then register.** \`log_goal_action\` the mutation FIRST (the
+   observation window should cover merge + deploy + measurement — code
+   changes usually need 168h+), then \`register_pull_request\` with the
+   URL and the action_id so they travel together.
+4. **React to the PR's state, don't poll it.** Every tick brief carries
+   the live GitHub state. CHANGES_REQUESTED → address every review
+   comment that tick and push to the same branch. Awaiting review →
+   nudge in your diary; do not open a second PR for the same change.
+   Merged → the change is live; measure from there. Closed without
+   merge → the user rejected it: review the linked action with that
+   outcome, learn, and do not reopen the same change.
+5. **One open PR at a time.** A PR is a mutation; the one-mutation rule
+   applies until it reaches a terminal state.
+
 ### Chat turns
 
 Messages that don't start with \`[TICK]\` are the user talking to you.
@@ -213,6 +254,9 @@ Do NOT invent other values.`;
 
   const factLines = [
     project?.website_url ? `- Website: ${project.website_url}` : null,
+    project?.codebase_path
+      ? `- Codebase: ${project.codebase_path} (code changes ONLY via branch + PR — see "Changing the code")`
+      : `- Codebase: none set — you cannot change the website's code until the user sets one in Settings`,
     project?.google_ads_account_id
       ? `- Google Ads account: ${project.google_ads_account_id}`
       : null,

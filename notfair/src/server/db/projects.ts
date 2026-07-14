@@ -127,6 +127,21 @@ export function setProjectMetaAdsAccount(
   return getProject(slug);
 }
 
+/** Same shape as setProjectGoogleAdsAccount but for the local codebase path. */
+export function setProjectCodebasePath(
+  slug: string,
+  codebase_path: string | null,
+): Project | null {
+  const db = getDb();
+  const existing = db.prepare("SELECT 1 FROM projects WHERE slug = ?").get(slug);
+  if (!existing) return null;
+  db.prepare("UPDATE projects SET codebase_path = ? WHERE slug = ?").run(
+    codebase_path,
+    slug,
+  );
+  return getProject(slug);
+}
+
 /** Same shape as setProjectGoogleAdsAccount but for the GSC property id. */
 export function setProjectGscProperty(
   slug: string,

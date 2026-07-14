@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import { getProject } from "@/server/db/projects";
 import { DangerZone } from "@/components/danger-zone";
 import { ProjectRenameCard } from "@/components/project-rename-card";
+import { CodebasePathCard } from "@/components/codebase-path-card";
 import { WorkspaceBrowserCard } from "@/components/workspace-browser-card";
 
 export default async function SettingsPage({
@@ -59,6 +60,16 @@ export default async function SettingsPage({
             </dd>
           </dl>
         </div>
+      </section>
+
+      <section>
+        <h2 className="ns-h2">
+          <span>Codebase</span>
+        </h2>
+        <CodebasePathCard
+          projectSlug={project.slug}
+          currentPath={project.codebase_path}
+        />
       </section>
 
       <section>

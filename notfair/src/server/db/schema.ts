@@ -183,6 +183,34 @@ CREATE TABLE IF NOT EXISTS goal_suggestions (
 CREATE INDEX IF NOT EXISTS idx_goal_suggestions_project
   ON goal_suggestions(project_slug, status);
 
+-- Pull requests a goal agent opened to change the workspace's codebase.
+-- The PR is the approval gate for code mutations: the agent never merges
+-- its own PR; the user reviews on GitHub. State is synced from the gh
+-- CLI at tick time and on goal-page views, so the loop reacts to reviews,
+-- comment counts, merges, and closes.
+CREATE TABLE IF NOT EXISTS goal_prs (
+  id          TEXT PRIMARY KEY,
+  goal_id     TEXT NOT NULL REFERENCES goals(id) ON DELETE CASCADE,
+  action_id   TEXT REFERENCES goal_actions(id) ON DELETE SET NULL,
+  url         TEXT NOT NULL,
+  title       TEXT NOT NULL,
+  branch      TEXT,
+  state       TEXT NOT NULL DEFAULT 'open'
+              CHECK (state IN ('open','merged','closed')),
+  -- GitHub reviewDecision: APPROVED / CHANGES_REQUESTED / REVIEW_REQUIRED
+  -- (empty for repos without required reviews). NULL until first sync.
+  review_decision TEXT,
+  comment_count   INTEGER NOT NULL DEFAULT 0,
+  is_draft        INTEGER NOT NULL DEFAULT 0,
+  merged_at       TEXT,
+  last_synced_at  TEXT,
+  sync_error      TEXT,
+  created_at  TEXT NOT NULL,
+  updated_at  TEXT NOT NULL,
+  UNIQUE(goal_id, url)
+);
+CREATE INDEX IF NOT EXISTS idx_goal_prs_goal ON goal_prs(goal_id, state);
+
 CREATE TABLE IF NOT EXISTS goal_ticks (
   id           TEXT PRIMARY KEY,
   goal_id      TEXT NOT NULL REFERENCES goals(id) ON DELETE CASCADE,

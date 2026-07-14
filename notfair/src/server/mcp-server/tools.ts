@@ -11,6 +11,7 @@ import {
   handleLogLearning,
   handleProposeGoalMetric,
   handleProposeTarget,
+  handleRegisterPullRequest,
   handleReviewGoalAction,
   handleSearchLearnings,
   handleSetProjectBrief,
@@ -441,6 +442,39 @@ async function handleSetSharedContextTool(input: unknown): Promise<ToolResult> {
   );
 }
 
+// ── register_pull_request ──────────────────────────────────────────────
+
+const registerPullRequestInput = z.object({
+  ...goalIdFields,
+  url: z
+    .string()
+    .min(1)
+    .describe(
+      "The GitHub pull-request URL you just opened, e.g. https://github.com/owner/repo/pull/123.",
+    ),
+  title: z.string().min(1).max(200).describe("The PR title."),
+  branch: z.string().optional().describe("The head branch name."),
+  action_id: z
+    .string()
+    .optional()
+    .describe(
+      "The log_goal_action id this PR executes — link them so the observation gate and the PR travel together.",
+    ),
+});
+
+async function handleRegisterPullRequestTool(
+  input: unknown,
+): Promise<ToolResult> {
+  const parsed = registerPullRequestInput.safeParse(input);
+  if (!parsed.success) return invalid(parsed.error);
+  const { project_slug, agent_id, ...rest } = parsed.data;
+  const r = await handleRegisterPullRequest(rest, { project_slug, agent_id });
+  if (!r.ok) return { ok: false, error: r.error };
+  return txt(
+    `PR registered (state: ${r.data.state}). The user sees it on your Goal tab for review; every tick brief carries its live state (reviews, comments, merged/closed). Do NOT merge it yourself — the user does.`,
+  );
+}
+
 // ── Registry ───────────────────────────────────────────────────────────
 
 export const TOOLS: ToolDefinition[] = [
@@ -492,6 +526,13 @@ export const TOOLS: ToolDefinition[] = [
       "Record a move BEFORE executing it: what, which resources, the falsifiable expected effect, and the observation window (review_after_hours, required for mutations). Gated resources are untouchable until their review date. Unlogged mutations are invisible to future ticks — always log first.",
     inputSchema: logGoalActionInput,
     handler: handleLogGoalActionTool,
+  },
+  {
+    name: "register_pull_request",
+    description:
+      "Record a pull request you just opened against the workspace's codebase (gh pr create → register here). The PR is the approval gate for code changes: the user reviews and merges on GitHub, the platform syncs its state (review decision, comments, merged/closed) into every tick brief, and your Goal tab shows it for review. Never merge your own PR.",
+    inputSchema: registerPullRequestInput,
+    handler: handleRegisterPullRequestTool,
   },
   {
     name: "review_goal_action",
