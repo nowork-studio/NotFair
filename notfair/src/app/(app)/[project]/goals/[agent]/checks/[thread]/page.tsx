@@ -69,6 +69,8 @@ export default async function CheckTranscriptPage({
           initialEvents={initialEvents}
           initialCursor={initialCursor}
           composerDisabled
+          disabledComposerPlaceholder="This check log is read-only — follow up from the goal chat"
+          showCompletedStatus
           mcpCatalog={mcpCatalog}
         />
       </div>

@@ -133,6 +133,12 @@ export interface HarnessModelOption {
   /** Human label for the dropdown. */
   label: string;
   /**
+   * True when omitting the model flag resolves to this model. The composer
+   * keeps the empty value as a genuine no-override selection, but uses this
+   * metadata to show the concrete model name instead of a vague "Default".
+   */
+  is_default?: boolean;
+  /**
    * Input context window in tokens, when the provider exposes it (codex
    * publishes it in models_cache.json). Absent when unknown.
    */

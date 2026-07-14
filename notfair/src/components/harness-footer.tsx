@@ -1,8 +1,17 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import { ChevronDown } from "lucide-react";
-import type { HarnessUsage, RateLimitWindow } from "@/server/harness-usage";
+import type {
+  CodexUsage,
+  HarnessUsage,
+  RateLimitWindow,
+} from "@/server/harness-usage";
+import {
+  refreshCodexUsageAction,
+  startCodexLoginAction,
+} from "@/server/actions/harness";
 
 type Props = {
   adapter: "claude-code-local" | "codex-local";
@@ -29,7 +38,12 @@ const COLLAPSE_KEY = "NotFair:harness-footer:collapsed";
  * reloads. Default is expanded.
  */
 export function HarnessFooter({ adapter, usage }: Props) {
+  const router = useRouter();
   const harnessName = HARNESS_LABEL[adapter];
+  const [currentUsage, setCurrentUsage] = useState(usage);
+  const [signingIn, setSigningIn] = useState(false);
+  const [signInError, setSignInError] = useState<string | null>(null);
+  const pollingRef = useRef(false);
   // Default to expanded; hydrate from localStorage after mount so SSR
   // and first paint stay deterministic.
   const [collapsed, setCollapsed] = useState(false);
@@ -55,42 +69,111 @@ export function HarnessFooter({ adapter, usage }: Props) {
     }
   }, [collapsed, hydrated]);
 
-  if (usage.kind === "codex") {
-    const planLabel = formatPlan(usage.plan);
+  useEffect(() => setCurrentUsage(usage), [usage]);
+
+  useEffect(() => {
+    if (!signingIn) return;
+    let attempts = 0;
+    const id = window.setInterval(async () => {
+      if (pollingRef.current) return;
+      pollingRef.current = true;
+      try {
+        const next = await refreshCodexUsageAction();
+        setCurrentUsage(next);
+        attempts += 1;
+        if (
+          next.kind === "codex" &&
+          next.auth !== "signed-out" &&
+          next.auth !== "unknown"
+        ) {
+          setSigningIn(false);
+          setSignInError(null);
+          router.refresh();
+        } else if (attempts >= 60) {
+          setSigningIn(false);
+          setSignInError("Sign-in was not completed. Try again when ready.");
+        }
+      } catch (err) {
+        attempts += 1;
+        if (attempts >= 60) {
+          setSigningIn(false);
+          setSignInError(
+            err instanceof Error
+              ? err.message
+              : "Couldn’t refresh Codex sign-in status.",
+          );
+        }
+      } finally {
+        pollingRef.current = false;
+      }
+    }, 2_000);
+    return () => window.clearInterval(id);
+  }, [router, signingIn]);
+
+  if (currentUsage.kind === "codex") {
+    const planLabel = formatPlan(currentUsage.plan);
+    const signedIn =
+      currentUsage.auth !== "signed-out" && currentUsage.auth !== "unknown";
     return (
       <FooterShell>
         <FooterHeader
           harness={harnessName}
-          chip={planLabel ? `ChatGPT ${planLabel}` : null}
-          chipTone="accent"
+          chip={codexChip(currentUsage, planLabel)}
+          chipTone={signedIn ? "accent" : "neutral"}
           collapsed={collapsed}
           onToggle={() => setCollapsed((v) => !v)}
         />
         {!collapsed &&
-          (usage.rateLimit ? (
+          (currentUsage.rateLimits.length > 0 ? (
             <div className="mt-2 space-y-2">
-              <UsageBar label="5-hour" window={usage.rateLimit.primary} />
-              <UsageBar label="Weekly" window={usage.rateLimit.secondary} />
+              {currentUsage.rateLimits.map((window) => (
+                <UsageBar
+                  key={`${window.label}:${window.limit_window_seconds}`}
+                  label={window.label}
+                  window={window}
+                />
+              ))}
+            </div>
+          ) : currentUsage.auth === "signed-out" ? (
+            <div className="mt-1.5 space-y-1.5">
+              <FooterDetail>Codex is signed out</FooterDetail>
+              <button
+                type="button"
+                disabled={signingIn}
+                onClick={async () => {
+                  setSignInError(null);
+                  const result = await startCodexLoginAction();
+                  if (!result.ok) {
+                    setSignInError(result.error);
+                    return;
+                  }
+                  setSigningIn(true);
+                }}
+                className="ns-btn ns-btn-outline ns-btn-sm w-full justify-center disabled:opacity-60"
+              >
+                {signingIn ? "Waiting for sign-in…" : "Sign in to Codex"}
+              </button>
+              {signInError && <FooterError>{signInError}</FooterError>}
             </div>
           ) : (
-            <FooterDetail>Sign in to Codex to see usage limits</FooterDetail>
+            <FooterDetail>{codexSignedInDetail(currentUsage)}</FooterDetail>
           ))}
       </FooterShell>
     );
   }
 
-  if (usage.kind === "claude-code") {
-    const detail = usage.stale
-      ? lastSeenLabel(usage.lastComputedDate)
-      : `${formatCount(usage.messagesToday)} msg · ${formatTokens(
-          usage.tokensToday,
+  if (currentUsage.kind === "claude-code") {
+    const detail = currentUsage.stale
+      ? lastSeenLabel(currentUsage.lastComputedDate)
+      : `${formatCount(currentUsage.messagesToday)} msg · ${formatTokens(
+          currentUsage.tokensToday,
         )} today`;
     return (
       <FooterShell>
         <FooterHeader
           harness={harnessName}
-          chip={usage.stale ? "Idle" : "Active today"}
-          chipTone={usage.stale ? "neutral" : "accent"}
+          chip={currentUsage.stale ? "Idle" : "Active today"}
+          chipTone={currentUsage.stale ? "neutral" : "accent"}
           collapsed={collapsed}
           onToggle={() => setCollapsed((v) => !v)}
         />
@@ -181,6 +264,31 @@ function FooterDetail({ children }: { children: React.ReactNode }) {
   );
 }
 
+function FooterError({ children }: { children: React.ReactNode }) {
+  return (
+    <p className="m-0 text-[10.5px] leading-snug text-destructive">{children}</p>
+  );
+}
+
+function codexChip(usage: CodexUsage, planLabel: string | null): string | null {
+  if (planLabel) return `ChatGPT ${planLabel}`;
+  if (usage.auth === "api-key") return "API key";
+  if (usage.auth === "agent-identity") return "Access token";
+  if (usage.auth === "chatgpt") return "ChatGPT";
+  return null;
+}
+
+function codexSignedInDetail(usage: CodexUsage): string {
+  if (usage.auth === "api-key") return "Signed in · usage billed by API";
+  if (usage.auth === "agent-identity") return "Signed in with access token";
+  if (usage.auth === "chatgpt") {
+    return usage.email
+      ? `Signed in as ${usage.email} · usage unavailable`
+      : "Signed in · usage limits unavailable";
+  }
+  return "Couldn’t check Codex sign-in";
+}
+
 /**
  * Usage bar — label + remaining percent + thin progress track + reset
  * timestamp. Mirrors the ChatGPT settings page bars but compact enough
@@ -238,7 +346,9 @@ function formatPlan(slug: string | null): string | null {
   // wham/usage returns lowercase plan slugs like "prolite", "pro",
   // "free", "plus". Title-case and tidy a couple of multi-word ones.
   const map: Record<string, string> = {
-    prolite: "Plus",
+    // `prolite` is the provider's internal slug for the lower Pro tier.
+    // It is still sold and presented to users as ChatGPT Pro.
+    prolite: "Pro",
     pro: "Pro",
     free: "Free",
     plus: "Plus",

@@ -103,10 +103,17 @@ type Props = {
   /** Byte offset *after* `initialEvents` — polls start from here. */
   initialCursor: number;
   /**
-   * When true, disables the composer (e.g., task is running and the user
-   * shouldn't send mid-run input). Default: composer always enabled.
+   * When true, disables the composer. This does not imply that a turn is
+   * still running; read-only transcript views also disable the composer.
    */
   composerDisabled?: boolean;
+  /**
+   * Optional explanation shown inside a disabled composer. Read-only
+   * transcript views use this instead of claiming the agent is working.
+   */
+  disabledComposerPlaceholder?: string;
+  /** Keep a static terminal status visible in read-only transcript views. */
+  showCompletedStatus?: boolean;
   /**
    * Set when the agent's task is parked in `blocked` (e.g., waiting on a
    * pending approval). Replaces the "thinking…" / "wrapping up…" indicator
@@ -134,12 +141,11 @@ type Props = {
    */
   leadingContent?: React.ReactNode;
   /**
-   * Models the composer's selector offers for this project's harness
-   * (from HARNESS_MODEL_OPTIONS, passed down by the server page). A
-   * "Default" choice (no override) is always prepended. Omitted/empty =
-   * no selector rendered.
+   * Models the composer's selector offers for this project's harness.
+   * The option marked `is_default` names the model used when no override
+   * flag is sent. Omitted/empty = no selector rendered.
    */
-  modelOptions?: Array<{ value: string; label: string }>;
+  modelOptions?: Array<{ value: string; label: string; is_default?: boolean }>;
 };
 
 export function LiveTranscript({
@@ -150,6 +156,8 @@ export function LiveTranscript({
   initialEvents,
   initialCursor,
   composerDisabled = false,
+  disabledComposerPlaceholder,
+  showCompletedStatus = false,
   blockedReason,
   mcpCatalog,
   leadingContent,
@@ -177,6 +185,11 @@ export function LiveTranscript({
     if (value) window.localStorage.setItem(modelStorageKey, value);
     else window.localStorage.removeItem(modelStorageKey);
   }
+  const defaultModelLabel =
+    modelOptions.find((option) => option.is_default)?.label ?? "Default";
+  const selectedModelLabel =
+    modelOptions.find((option) => option.value === model)?.label ??
+    defaultModelLabel;
   const [cursor, setCursor] = useState(initialCursor);
   const [input, setInput] = useState("");
   const [sendingChat, setSendingChat] = useState(false);
@@ -336,10 +349,9 @@ export function LiveTranscript({
     }
   }, [agentSlug, cursor, projectSlug, threadId]);
 
-  // Poll faster while the parent says the task is in flight — typical
-  // first-task experience is "land on workspace, watch the audit run."
-  // 2s feels laggy when nothing's on screen; 800ms keeps the pulse fresh.
-  const pollIntervalMs = composerDisabled ? 800 : POLL_INTERVAL_MS;
+  // Poll faster only during an active send. A disabled composer can also
+  // mean "read-only history," which should not be treated as live work.
+  const pollIntervalMs = sendingChat ? 800 : POLL_INTERVAL_MS;
 
   // Background polling: runs while mounted, paused during an active send so
   // we don't double-render content we're already streaming via SSE.
@@ -467,21 +479,20 @@ export function LiveTranscript({
               // Same store the selector next to Send uses.
               const wanted = action.value.toLowerCase();
               const names = [
-                "default",
+                `${defaultModelLabel} (default)`,
                 ...modelOptions.map((m) => m.label),
               ].join(", ");
               if (!wanted) {
                 toast.message("Model", {
                   description: `Current: ${
-                    modelOptions.find((m) => m.value === model)?.label ??
-                    "Default"
+                    selectedModelLabel
                   }. Options: ${names}.`,
                 });
                 return;
               }
               if (wanted === "default") {
                 onPickModel("");
-                toast.success("Model reset to default.");
+                toast.success(`Model reset to ${defaultModelLabel}.`);
                 return;
               }
               const match = modelOptions.find(
@@ -614,18 +625,21 @@ export function LiveTranscript({
   );
 
   const rendered = useMemo(() => collapseEvents(events), [events]);
-  // Show the working indicator any time the agent is plausibly running —
-  // the user just sent (sendingChat) OR the parent says the task is in
-  // flight (composerDisabled). Keep it at the bottom of the transcript
-  // throughout the turn, BELOW pending tool calls and streaming text,
-  // so the user sees the same anchor whether the agent is mid-call,
-  // mid-stream, or waiting on the next model token.
+  const transcriptEnded = events.some(
+    (e) => e.kind === "lifecycle" && e.phase === "done",
+  );
+  // Keep the indicator at the bottom of the transcript throughout a live
+  // turn. Read-only logs can opt into a static completed status, but merely
+  // disabling the composer must never manufacture a forever-running state.
   //
   // (Earlier we hid the indicator once anything pending was rendered.
   // That made the chat read as "stuck" the moment streaming started —
   // there was no longer any active animation to telegraph "I'm still
   // working.")
-  const showThinking = sendingChat || composerDisabled || Boolean(blockedReason);
+  const showThinking =
+    sendingChat ||
+    Boolean(blockedReason) ||
+    (showCompletedStatus && transcriptEnded);
 
   return (
     <div className="flex h-full flex-col">
@@ -756,7 +770,8 @@ export function LiveTranscript({
               disabled={composerDisabled}
               placeholder={
                 composerDisabled
-                  ? "The agent is working — the transcript updates live"
+                  ? disabledComposerPlaceholder ??
+                    "The agent is working — the transcript updates live"
                   : blockedReason
                     ? "Reply — the agent will see your message"
                     : "Message this goal's agent…  (type / for commands)"
@@ -778,8 +793,7 @@ export function LiveTranscript({
                       className="inline-flex max-w-44 items-center gap-1 rounded-md px-2 py-1 text-xs text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
                     >
                       <span className="truncate">
-                        {modelOptions.find((m) => m.value === model)?.label ??
-                          "Default"}
+                        {selectedModelLabel}
                       </span>
                       <ChevronDown className="size-3 shrink-0" aria-hidden />
                     </button>
@@ -790,7 +804,7 @@ export function LiveTranscript({
                       onValueChange={onPickModel}
                     >
                       <DropdownMenuRadioItem value="">
-                        Default
+                        {defaultModelLabel} (default)
                       </DropdownMenuRadioItem>
                       {modelOptions.map((m) => (
                         <DropdownMenuRadioItem key={m.value} value={m.value}>
@@ -825,16 +839,18 @@ export function LiveTranscript({
               )}
             </div>
           </form>
-          <p className="pt-1.5 text-center text-[10px] text-muted-foreground">
-            {sendingChat ? (
-              <span className="inline-flex items-center gap-1.5">
-                <RunningDot size="sm" aria-label="" />
-                Streaming — click stop to abort
-              </span>
-            ) : (
-              <>Enter to send · Shift+Enter for newline</>
-            )}
-          </p>
+          {(sendingChat || !composerDisabled) && (
+            <p className="pt-1.5 text-center text-[10px] text-muted-foreground">
+              {sendingChat ? (
+                <span className="inline-flex items-center gap-1.5">
+                  <RunningDot size="sm" aria-label="" />
+                  Streaming — click stop to abort
+                </span>
+              ) : (
+                <>Enter to send · Shift+Enter for newline</>
+              )}
+            </p>
+          )}
         </div>
       </div>
     </div>
@@ -1370,10 +1386,15 @@ function LiveWorkingIndicator({
   hasPendingAssistant?: boolean;
 }) {
   const [now, setNow] = useState<number>(() => Date.now());
+  const visiblyEnded =
+    events.some((e) => e.kind === "lifecycle" && e.phase === "done") &&
+    !pendingTools?.some((t) => !t.done) &&
+    !hasPendingAssistant;
   useEffect(() => {
+    if (visiblyEnded) return;
     const id = setInterval(() => setNow(Date.now()), 1000);
     return () => clearInterval(id);
-  }, []);
+  }, [visiblyEnded]);
 
   const view = deriveWorkingView({
     agentDisplayName,
@@ -1398,7 +1419,10 @@ function LiveWorkingIndicator({
     if (turnStartedAt && lastTs) return Math.max(turnStartedAt, lastTs);
     return turnStartedAt ?? lastTs;
   })();
-  const elapsedMs = anchorTs != null ? Math.max(0, now - anchorTs) : null;
+  const elapsedMs =
+    view.mood !== "ended" && anchorTs != null
+      ? Math.max(0, now - anchorTs)
+      : null;
 
   return (
     <WorkingIndicator
@@ -1465,10 +1489,9 @@ function deriveWorkingView(input: {
       : events;
   // Turn-ended signal: the harness emits a `final` event when its run
   // completes; transcript-tail surfaces it as `{ kind: "lifecycle",
-  // phase: "done" }`. Once we've seen it, the agent has stopped
-  // producing tokens — keep the trajectory chips but stop the spinning
-  // "Wrapping up" pill (which otherwise rolls on indefinitely while the
-  // task waits for the agent's now-missing `submit_task_status` call).
+  // phase: "done" }`. Once we've seen it, the agent has stopped producing
+  // tokens. Keep the trajectory chips, but switch every live affordance
+  // to the static completed presentation.
   const turnEnded = turnEvents.some(
     (e) => e.kind === "lifecycle" && e.phase === "done",
   );
@@ -1486,16 +1509,12 @@ function deriveWorkingView(input: {
   })();
   const phases = buildPhases(turnEvents, pendingTools);
 
-  // Highest precedence: the run has ended cleanly. Don't lie to the user
-  // by showing "Wrapping up" with a spinner for what is in fact a
-  // completed turn that's now parked waiting for the agent to either
-  // call submit_task_status (which it forgot) or for the user to
-  // intervene.
+  // Highest precedence: the harness has emitted its normal final event.
+  // This is a completed turn, not a parked task and not an error.
   if (turnEnded && !pendingInFlightTool && !hasPendingAssistant) {
     return {
-      headline: "Turn ended",
-      subtitle:
-        "Agent stopped without closing the task — open Approvals or send a follow-up.",
+      headline: "Turn complete",
+      subtitle: null,
       phases,
       mood: "ended",
     };

@@ -1,6 +1,7 @@
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
+import { spawn } from "node:child_process";
 
 /**
  * Read what each local AI-agent harness exposes about the user's account
@@ -35,15 +36,28 @@ export type RateLimitWindow = {
   reset_at: number;
 };
 
+export type LabeledRateLimitWindow = RateLimitWindow & {
+  /** Stable label derived from the provider's actual window duration. */
+  label: string;
+};
+
+export type CodexAuthStatus =
+  | "chatgpt"
+  | "api-key"
+  | "agent-identity"
+  | "signed-out"
+  | "unknown";
+
 export type CodexUsage = {
   kind: "codex";
+  /** Authentication comes from `codex login status`, not usage shape. */
+  auth: CodexAuthStatus;
   /** Codex plan name from wham/usage (e.g. "prolite", "pro", "free"). */
   plan: string | null;
   /** Account email from the JWT — used as a tooltip / accessibility hint. */
   email: string | null;
-  /** Two-window rate limits, or null when the API call failed.
-   *  primary = short rolling window (~5h); secondary = ~7d window. */
-  rateLimit: { primary: RateLimitWindow; secondary: RateLimitWindow } | null;
+  /** Any usage windows returned by the provider, shortest first. */
+  rateLimits: LabeledRateLimitWindow[];
 };
 
 export type ClaudeUsage = {
@@ -71,6 +85,7 @@ export type HarnessUsage =
 type CacheEntry = { until: number; value: HarnessUsage };
 const cache = new Map<string, CacheEntry>();
 const CACHE_TTL_MS = 60_000;
+const CODEX_BIN = process.env.NOTFAIR_CODEX_BIN?.trim() || "codex";
 
 export async function readHarnessUsage(
   adapter: "claude-code-local" | "codex-local",
@@ -89,26 +104,57 @@ export async function readHarnessUsage(
   return value;
 }
 
+/** Force a fresh auth + usage read after an interactive login attempt. */
+export async function refreshHarnessUsage(
+  adapter: "claude-code-local" | "codex-local",
+): Promise<HarnessUsage> {
+  cache.delete(adapter);
+  return readHarnessUsage(adapter);
+}
+
 async function readCodexUsage(): Promise<HarnessUsage> {
+  let authStatus = await readCodexLoginStatus();
   const authFile = path.join(os.homedir(), ".codex", "auth.json");
   if (!fs.existsSync(authFile)) {
-    return { kind: "codex", plan: null, email: null, rateLimit: null };
+    return {
+      kind: "codex",
+      auth: authStatus,
+      plan: null,
+      email: null,
+      rateLimits: [],
+    };
   }
   const auth = JSON.parse(fs.readFileSync(authFile, "utf-8")) as {
-    tokens?: { access_token?: string; id_token?: string };
+    auth_mode?: string;
+    tokens?: {
+      access_token?: string;
+      id_token?: string;
+      account_id?: string;
+    };
   };
   const accessToken = auth.tokens?.access_token;
+  if (authStatus === "unknown") {
+    authStatus = inferAuthStatus(auth.auth_mode, Boolean(accessToken));
+  }
   if (!accessToken) {
-    return { kind: "codex", plan: null, email: null, rateLimit: null };
+    return {
+      kind: "codex",
+      auth: authStatus,
+      plan: null,
+      email: null,
+      rateLimits: [],
+    };
   }
 
   // Decode just to pull the email + chatgpt account id (needed as the
   // ChatGPT-Account-Id header so the backend scopes the response to
   // the right workspace).
-  const { email, accountId } = decodeIdToken(auth.tokens?.id_token);
+  const tokenInfo = decodeIdToken(auth.tokens?.id_token);
+  const email = tokenInfo.email;
+  const accountId = auth.tokens?.account_id ?? tokenInfo.accountId;
 
-  let plan: string | null = null;
-  let rateLimit: CodexUsage["rateLimit"] = null;
+  let plan: string | null = tokenInfo.plan;
+  let rateLimits: LabeledRateLimitWindow[] = [];
   try {
     const ctrl = new AbortController();
     const t = setTimeout(() => ctrl.abort(), 4000);
@@ -117,41 +163,40 @@ async function readCodexUsage(): Promise<HarnessUsage> {
       Accept: "application/json",
     };
     if (accountId) headers["ChatGPT-Account-Id"] = accountId;
-    const res = await fetch("https://chatgpt.com/backend-api/wham/usage", {
-      headers,
-      signal: ctrl.signal,
-    });
-    clearTimeout(t);
-    if (res.ok) {
-      const body = (await res.json()) as {
-        plan_type?: string;
-        rate_limit?: {
-          primary_window?: RateLimitWindow;
-          secondary_window?: RateLimitWindow;
+    try {
+      const res = await fetch("https://chatgpt.com/backend-api/wham/usage", {
+        headers,
+        signal: ctrl.signal,
+      });
+      if (res.ok) {
+        const body = (await res.json()) as {
+          plan_type?: string;
+          rate_limit?: {
+            primary_window?: RateLimitWindow | null;
+            secondary_window?: RateLimitWindow | null;
+          };
         };
-      };
-      if (typeof body.plan_type === "string") plan = body.plan_type;
-      const p = body.rate_limit?.primary_window;
-      const s = body.rate_limit?.secondary_window;
-      if (p && s) {
-        rateLimit = { primary: p, secondary: s };
+        if (typeof body.plan_type === "string") plan = body.plan_type;
+        rateLimits = normalizeCodexRateLimits(body.rate_limit);
       }
+    } finally {
+      clearTimeout(t);
     }
   } catch {
-    // Network error / abort — leave rateLimit null; the footer falls
-    // back to the plan chip only.
+    // Network error / abort. Authentication remains independently known.
   }
 
-  return { kind: "codex", plan, email, rateLimit };
+  return { kind: "codex", auth: authStatus, plan, email, rateLimits };
 }
 
 function decodeIdToken(idToken: string | undefined): {
   email: string | null;
   accountId: string | null;
+  plan: string | null;
 } {
-  if (!idToken) return { email: null, accountId: null };
+  if (!idToken) return { email: null, accountId: null, plan: null };
   const parts = idToken.split(".");
-  if (parts.length < 2) return { email: null, accountId: null };
+  if (parts.length < 2) return { email: null, accountId: null, plan: null };
   try {
     const claims = JSON.parse(
       Buffer.from(parts[1]!, "base64url").toString("utf-8"),
@@ -166,10 +211,98 @@ function decodeIdToken(idToken: string | undefined): {
         typeof authClaims.chatgpt_account_id === "string"
           ? authClaims.chatgpt_account_id
           : null,
+      plan:
+        typeof authClaims.chatgpt_plan_type === "string"
+          ? authClaims.chatgpt_plan_type
+          : null,
     };
   } catch {
-    return { email: null, accountId: null };
+    return { email: null, accountId: null, plan: null };
   }
+}
+
+export function normalizeCodexRateLimits(
+  rateLimit:
+    | {
+        primary_window?: RateLimitWindow | null;
+        secondary_window?: RateLimitWindow | null;
+      }
+    | null
+    | undefined,
+): LabeledRateLimitWindow[] {
+  return [rateLimit?.primary_window, rateLimit?.secondary_window]
+    .filter((window): window is RateLimitWindow => isRateLimitWindow(window))
+    .sort((a, b) => a.limit_window_seconds - b.limit_window_seconds)
+    .map((window) => ({ ...window, label: labelForRateLimitWindow(window) }));
+}
+
+function isRateLimitWindow(value: unknown): value is RateLimitWindow {
+  if (!value || typeof value !== "object") return false;
+  const window = value as Partial<RateLimitWindow>;
+  return (
+    typeof window.used_percent === "number" &&
+    typeof window.limit_window_seconds === "number" &&
+    typeof window.reset_at === "number"
+  );
+}
+
+function labelForRateLimitWindow(window: RateLimitWindow): string {
+  const seconds = window.limit_window_seconds;
+  if (seconds === 18_000) return "5-hour";
+  if (seconds === 86_400) return "Daily";
+  if (seconds === 604_800) return "Weekly";
+  if (seconds % 86_400 === 0) return `${seconds / 86_400}-day`;
+  if (seconds % 3_600 === 0) return `${seconds / 3_600}-hour`;
+  return "Usage";
+}
+
+export function parseCodexLoginStatus(output: string): CodexAuthStatus {
+  const normalized = output.trim().toLowerCase();
+  if (normalized.includes("logged in using chatgpt")) return "chatgpt";
+  if (normalized.includes("logged in using an api key")) return "api-key";
+  if (normalized.includes("logged in using agent identity")) {
+    return "agent-identity";
+  }
+  if (normalized.includes("not logged in")) return "signed-out";
+  return "unknown";
+}
+
+async function readCodexLoginStatus(): Promise<CodexAuthStatus> {
+  return new Promise((resolve) => {
+    let output = "";
+    let settled = false;
+    const child = spawn(CODEX_BIN, ["login", "status"], {
+      stdio: ["ignore", "pipe", "pipe"],
+    });
+    const finish = () => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      resolve(parseCodexLoginStatus(output));
+    };
+    const timer = setTimeout(() => {
+      try {
+        child.kill("SIGTERM");
+      } catch {
+        // Ignore a process that already exited.
+      }
+      finish();
+    }, 3_000);
+    child.stdout.on("data", (chunk: Buffer) => (output += chunk.toString("utf8")));
+    child.stderr.on("data", (chunk: Buffer) => (output += chunk.toString("utf8")));
+    child.once("error", finish);
+    child.once("close", finish);
+  });
+}
+
+function inferAuthStatus(
+  authMode: string | undefined,
+  hasAccessToken: boolean,
+): CodexAuthStatus {
+  if (!hasAccessToken) return "unknown";
+  if (authMode === "chatgpt") return "chatgpt";
+  if (authMode === "apikey" || authMode === "api-key") return "api-key";
+  return "unknown";
 }
 
 function readClaudeUsage(): HarnessUsage {

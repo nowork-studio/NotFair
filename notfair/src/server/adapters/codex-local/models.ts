@@ -35,9 +35,62 @@ const FALLBACK: HarnessModelOption[] = [
   { value: "gpt-5.4", label: "GPT-5.4" },
 ];
 
+async function readConfiguredModel(configFile: string): Promise<string | null> {
+  try {
+    const raw = await readFile(configFile, "utf8");
+    // NotFair invokes Codex without a profile, so only the root-level `model`
+    // applies. Stop at the first TOML table to avoid mistaking a nested key
+    // for the CLI's effective default.
+    for (const line of raw.split(/\r?\n/)) {
+      const trimmed = line.trim();
+      if (trimmed.startsWith("[")) break;
+      const match = /^model\s*=\s*("(?:\\.|[^"\\])*"|'[^']*'|[^\s#]+)\s*(?:#.*)?$/.exec(
+        trimmed,
+      );
+      if (!match) continue;
+      const value = match[1];
+      if (value.startsWith('"')) {
+        try {
+          return JSON.parse(value) as string;
+        } catch {
+          return null;
+        }
+      }
+      return value.startsWith("'") ? value.slice(1, -1) : value;
+    }
+  } catch {
+    // Missing or unreadable config means Codex uses its provider default.
+  }
+  return null;
+}
+
+function markDefaultModel(
+  models: HarnessModelOption[],
+  configuredModel: string | null,
+): HarnessModelOption[] {
+  const defaultValue = configuredModel ?? models[0]?.value;
+  if (!defaultValue) return models;
+
+  let found = false;
+  const marked = models.map((model) => {
+    const isDefault = model.value === defaultValue;
+    if (isDefault) found = true;
+    return isDefault ? { ...model, is_default: true } : model;
+  });
+
+  // A configured model can be absent from a stale provider cache. Keep it
+  // visible as the effective default rather than falling back to a wrong
+  // label until Codex refreshes models_cache.json.
+  return found
+    ? marked
+    : [{ value: defaultValue, label: defaultValue, is_default: true }, ...marked];
+}
+
 export async function listCodexModels(
   cacheFile: string = join(codexConfigDir(), "models_cache.json"),
+  configFile: string = join(codexConfigDir(), "config.toml"),
 ): Promise<HarnessModelOption[]> {
+  const configuredModel = await readConfiguredModel(configFile);
   try {
     const raw = await readFile(cacheFile, "utf8");
     const parsed = JSON.parse(raw) as { models?: CachedModel[] };
@@ -60,8 +113,8 @@ export async function listCodexModels(
           ? { context_window: m.context_window }
           : {}),
       }));
-    return models.length > 0 ? models : FALLBACK;
+    return markDefaultModel(models.length > 0 ? models : FALLBACK, configuredModel);
   } catch {
-    return FALLBACK;
+    return markDefaultModel(FALLBACK, configuredModel);
   }
 }

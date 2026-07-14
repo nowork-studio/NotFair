@@ -58,6 +58,7 @@ export function WorkingIndicator({
   mood: WorkingMood;
 }) {
   const palette = MOOD_PALETTES[mood];
+  const ended = mood === "ended";
   // Only show the last few phases — older ones scroll off-screen, the
   // full transcript is the source of truth for history. Three keeps the
   // strip dense without wrapping at common widths.
@@ -74,21 +75,23 @@ export function WorkingIndicator({
         palette.ring,
       )}
     >
-      {/* Aurora top edge — primary "alive" signal. */}
-      <span
-        aria-hidden
-        className="pointer-events-none absolute inset-x-0 top-0 h-[2px] overflow-hidden"
-      >
+      {!ended && (
+        /* Aurora top edge — primary "alive" signal. */
         <span
-          className={cn(
-            "absolute inset-y-0 left-0 w-1/3",
-            "motion-safe:animate-aurora-sweep",
-          )}
-          style={{
-            backgroundImage: `linear-gradient(to right, transparent, ${palette.beam}, transparent)`,
-          }}
-        />
-      </span>
+          aria-hidden
+          className="pointer-events-none absolute inset-x-0 top-0 h-[2px] overflow-hidden"
+        >
+          <span
+            className={cn(
+              "absolute inset-y-0 left-0 w-1/3",
+              "motion-safe:animate-aurora-sweep",
+            )}
+            style={{
+              backgroundImage: `linear-gradient(to right, transparent, ${palette.beam}, transparent)`,
+            }}
+          />
+        </span>
+      )}
 
       <div className="flex items-start gap-3 px-3.5 py-2.5">
         {/* Mood dot: scaling heartbeat with a soft halo. */}
@@ -106,7 +109,7 @@ export function WorkingIndicator({
             className={cn(
               "relative inline-block h-2 w-2 rounded-full",
               palette.dotBg,
-              "motion-safe:animate-heartbeat",
+              !ended && "motion-safe:animate-heartbeat",
             )}
           />
         </span>
@@ -120,7 +123,7 @@ export function WorkingIndicator({
             <span className="text-muted-foreground/60">·</span>
             <span className="text-foreground/85">
               {headline}
-              <BreathingDots />
+              {!ended && <BreathingDots />}
             </span>
           </div>
 
@@ -139,7 +142,11 @@ export function WorkingIndicator({
                   key={phase.id}
                   className="flex items-center gap-1"
                 >
-                  <PhaseChip phase={phase} palette={palette} />
+                  <PhaseChip
+                    phase={phase}
+                    palette={palette}
+                    animated={!ended}
+                  />
                   {idx < visiblePhases.length - 1 && (
                     <ChevronRight
                       className="size-3 text-muted-foreground/35"
@@ -153,7 +160,7 @@ export function WorkingIndicator({
         </div>
 
         {/* Elapsed readout — small digital pill, right aligned. */}
-        {elapsedMs != null && (
+        {!ended && elapsedMs != null && (
           <span
             className={cn(
               "inline-flex shrink-0 items-center rounded border px-1.5 py-0.5",
@@ -167,21 +174,23 @@ export function WorkingIndicator({
         )}
       </div>
 
-      {/* Shimmer bottom edge — continuous motion when waiting. */}
-      <span
-        aria-hidden
-        className="pointer-events-none absolute inset-x-0 bottom-0 h-[1.5px] overflow-hidden"
-      >
+      {!ended && (
+        /* Shimmer bottom edge — continuous motion when waiting. */
         <span
-          className={cn(
-            "absolute inset-y-0 left-0 w-1/4 opacity-70",
-            "motion-safe:animate-shimmer-bar",
-          )}
-          style={{
-            backgroundImage: `linear-gradient(to right, transparent, ${palette.beam}, transparent)`,
-          }}
-        />
-      </span>
+          aria-hidden
+          className="pointer-events-none absolute inset-x-0 bottom-0 h-[1.5px] overflow-hidden"
+        >
+          <span
+            className={cn(
+              "absolute inset-y-0 left-0 w-1/4 opacity-70",
+              "motion-safe:animate-shimmer-bar",
+            )}
+            style={{
+              backgroundImage: `linear-gradient(to right, transparent, ${palette.beam}, transparent)`,
+            }}
+          />
+        </span>
+      )}
     </div>
   );
 }
@@ -189,9 +198,11 @@ export function WorkingIndicator({
 function PhaseChip({
   phase,
   palette,
+  animated,
 }: {
   phase: WorkingPhase;
   palette: MoodPalette;
+  animated: boolean;
 }) {
   if (phase.state === "done") {
     return (
@@ -238,15 +249,17 @@ function PhaseChip({
       <span className="max-w-[14rem] truncate font-mono text-[10px] font-medium">
         {phase.label}
       </span>
-      {/* tiny in-chip pulse ring */}
-      <span
-        aria-hidden
-        className={cn(
-          "absolute inset-0 rounded-full ring-1 ring-inset",
-          palette.chipRing,
-          "motion-safe:animate-phase-glow",
-        )}
-      />
+      {animated && (
+        /* tiny in-chip pulse ring */
+        <span
+          aria-hidden
+          className={cn(
+            "absolute inset-0 rounded-full ring-1 ring-inset",
+            palette.chipRing,
+            "motion-safe:animate-phase-glow",
+          )}
+        />
+      )}
     </span>
   );
 }
@@ -373,9 +386,8 @@ const MOOD_PALETTES: Record<WorkingMood, MoodPalette> = {
     beam: "hsl(38 92% 55%)",
   },
   ended: {
-    // Muted slate — visually static, no urgency. The aurora bar + dot
-    // heartbeat still animate per shared component, but the cold palette
-    // reads as "done, parked" rather than "actively working".
+    // Muted slate and fully static. A completed turn must not retain any
+    // of the motion language used to communicate active work.
     ring: "ring-slate-500/15",
     dotBg: "bg-slate-500",
     haloBg: "bg-slate-400/30",
