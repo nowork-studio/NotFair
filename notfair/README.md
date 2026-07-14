@@ -7,12 +7,14 @@ Open source. Runs entirely on your machine. Bring your own LLM credentials (via 
 ## What it gives you
 
 - **Goals are the identity.** Type the ambition, and you land in a chat where the goal's agent is already working: it sharpens the ask, labels the goal ("Wasted X spend → $0"), authors + tests a metric query against your connected platforms, and the platform *re-runs the query server-side* — only a reproducible number with a measured baseline goes on the books. You agree the target in chat; the loop starts only when you press **START** (and the first tick runs immediately). Two modes: **achieve** (reach the number, done) and **maintain** (hold it there forever — a watchdog).
+- **Platform-focused onboarding.** Connect the data sources a goal needs, choose the relevant account or property, and tag the goal with its platform focus. NotFair keeps the goal scoped to those connections while the anonymous goal agent remains implementation detail.
 - **The tick loop.** On the cadence you agree, the platform measures the metric mechanically (the agent never self-reports the number it's judged on) and wakes the agent: it scores past moves against their predicted effects, then makes at most **one** new move — every mutation logged with a falsifiable expected effect and an observation window that gates its resources until review. The agent's page is the diary: sparkline vs. target, tick-by-tick log, open actions, accumulated memory.
 - **Fully autonomous, visibly so.** No approval inbox — agents act inside a spend envelope you set, with the observation-window discipline and your pause button as the controls, and every move on the record.
+- **Code changes through pull requests.** Attach a GitHub-backed codebase and an agent can work in its own branch, commit and push the change, then register the pull request with NotFair. The app tracks the PR while you retain the merge decision, and only one code mutation stays open for a goal at a time.
 - **Shared context + private memory.** `PROJECT.md` is the workspace brief every agent carries (any agent can update it via `set_shared_context`); each agent also keeps its own learnings ledger and workspace files. All connected MCPs are shared by every agent.
 - **One screen per goal.** The conversation and the loop's state live together: chat on the left (where the goal is defined and steered), a status rail on the right — the progress chart, the plan, every check with its full log, open actions with review dates, and the agent's memory. No tabs, no thread management, nothing else to learn.
 - **Progress you can see.** A time-true chart with the target line, every agent action as a marker on the moment it happened (hover: what it did, what it predicted, what actually happened), observation windows shaded, and history backfilled at setup from the platform's own date-segmented stats — context from day one. Maintain goals get a streak ("held at target for 12 days") with a per-check strip; the workspace index shows a mini sparkline + 7-day delta per goal.
-- **Project-scoped MCP connections** — one-click PKCE OAuth to bring third-party tools (Google Ads via NotFair's hosted MCP) into the agents' toolbox. Tokens stored in SQLite, never in env vars, and wired into the chosen harness automatically.
+- **Project-scoped MCP connections** — one-click PKCE OAuth brings third-party tools (Google Ads via NotFair's hosted MCP) into the agents' toolbox. Connection records are stored in local SQLite and wired into the chosen harness automatically; Codex receives bearer tokens through per-server environment variables at process launch.
 
 ## Pick your harness
 
@@ -20,8 +22,8 @@ At onboarding you pick which local AI coding agent runs the work:
 
 | Harness | Status | Notes |
 |---|---|---|
-| **Claude Code** | Recommended | Uses your existing `claude` login. Per-agent `.mcp.json` for isolation. |
-| **Codex** | Supported | Uses your existing `codex` login. Per-server env-var bearers. Requires `--dangerously-bypass-approvals-and-sandbox` (set by the adapter) so tool calls and loopback reach your local orchestration MCP. |
+| **Codex** | Recommended | Uses your existing `codex` login. Per-server env-var bearers. The sidebar reports the authenticated account's plan and usage, and model selectors show the configured model name. Requires `--dangerously-bypass-approvals-and-sandbox` (set by the adapter) so tool calls and loopback reach your local orchestration MCP. |
+| **Claude Code** | Supported | Uses your existing `claude` login. Per-agent `.mcp.json` for isolation. |
 
 Different projects can run on different harnesses; the choice persists on the project row.
 
@@ -32,7 +34,7 @@ Different projects can run on different harnesses; the choice persists on the pr
   - [Claude Code](https://docs.claude.com/en/docs/agents-and-tools/claude-code/overview), or
   - [Codex CLI](https://github.com/openai/codex)
 
-Run `NotFair doctor` to verify Node, both harnesses, data dir, and port.
+Run `notfair doctor` to verify Node, the available harnesses, the data directory, and the port.
 
 ## Install + run
 
@@ -43,7 +45,7 @@ npx notfair@latest             # launch UI on http://127.0.0.1:3327
 
 # Or install globally:
 npm install -g notfair
-NotFair
+notfair
 ```
 
 The UI opens in your browser. Sidebar is project-scoped; create one to start.
@@ -51,35 +53,35 @@ The UI opens in your browser. Sidebar is project-scoped; create one to start.
 ## CLI
 
 ```
-NotFair                 Launch local server + open UI (default)
-NotFair start           Same as above
-NotFair doctor          Run preflight checks (see below)
-NotFair --version
-NotFair --help
+notfair                 Launch local server + open UI (default)
+notfair start           Same as above
+notfair doctor          Run preflight checks (see below)
+notfair --version
+notfair --help
 ```
 
 Options on `start`: `--port <n>` (default 3327), `--no-open`, `--data-dir <path>`.
 Options on `doctor`: `--port <n>`, `--data-dir <path>`.
 
-`doctor` runs five checks: Node ≥ 20 (24 recommended), Claude Code on PATH, Codex on PATH, at least one harness ready, data dir writable, and the preferred port free. Exits 0 if every check is passing, 1 otherwise, with a `Fix:` line under each failure naming the exact command to run.
+`doctor` checks Node ≥ 20 (24 recommended), Claude Code on PATH, Codex on PATH, at least one harness ready, a writable data directory, and a free preferred port. It exits 0 if every check is passing and 1 otherwise, with a `Fix:` line under each failure naming the exact command to run.
 
 ## What happens when you create a goal
 
-1. You name an agent on the workspace page — a goal row (status `intake`) and the agent's workspace at `~/.notfair/agents/<slug>-goal-<name>/` are created together, with an `IDENTITY.md` carrying the goal spec + the loop protocol, mirrored into the harness's native config (`CLAUDE.md` / `AGENTS.md`, `.mcp.json` for Claude Code, sections in `~/.codex/config.toml` for Codex). Every connected MCP is wired in.
-2. You chat: the agent records the ambition (`define_goal`), authors + tests a metric query, submits it (`propose_goal_metric` — the platform re-runs it server-side and stores the measured baseline), and, once you explicitly confirm the target, starts the loop (`activate_goal`).
-3. The heartbeat rides a `setInterval` in the Next.js process polling every 30 s; due goals get a tick — metric measured, brief composed from the DB, one adapter turn, diary row written.
+1. You type a goal statement and can select its platform focus. NotFair creates the goal row (status `intake`), provisions an anonymous goal agent, and creates its workspace at `~/.notfair/agents/<agent-id>/`. The goal protocol is mirrored into the harness's native config (`CLAUDE.md` / `AGENTS.md`, `.mcp.json` for Claude Code, sections in `~/.codex/config.toml` for Codex), with the project's connected MCPs wired in.
+2. You chat while the agent records the ambition (`define_goal`), authors and tests a metric query, submits it (`propose_goal_metric` — the platform re-runs it server-side and stores the measured baseline), then proposes the measured target (`propose_target`). The loop does not activate itself: you press **START**, and the first tick runs immediately.
+3. The heartbeat rides a `setInterval` in the Next.js process polling every 30 seconds. Due goals get a tick: the metric is measured, a brief is composed from the database, one adapter turn runs, and the diary row is written. A completed check opens as a static log instead of remaining in a streaming state.
 
-## Scheduling recurring work
+## Code changes through pull requests
 
-Beyond goal heartbeats, agents can call the `schedule_recurring_work` MCP tool for auxiliary cron jobs, and you can schedule manually via the **+ New cron** button on the Crons tab. Same 30 s tick loop, same per-project harness dispatch.
+Attach a local Git repository to the project in **Settings → Codebase**. When a goal requires source changes, the agent works in a dedicated worktree and branch, commits and pushes its changes, opens a GitHub pull request, and registers it with NotFair. Pull-request state is synchronized back into the goal, but the agent never merges it; review and merge remain with you. An open code observation gate prevents the same goal from starting another code mutation until the pull request is resolved.
 
 ## Connecting MCP servers (for live ad-platform data)
 
 The Connections page lists the MCP servers in our catalog (NotFair Google Ads, Meta Ads, Google Search Console, Google Analytics, X Ads — plus browseable extras like Stripe and Supabase, or any custom MCP URL). Click **Connect** to start a one-click PKCE OAuth flow — no environment variables to set, no Google Cloud project of your own to register.
 
-The token is persisted into `mcp_tokens` (SQLite) and the catalog MCP is automatically registered with every agent in the project via the chosen harness's config. New agents provisioned later get the same wiring.
+Connections that expose multiple accounts or properties let you choose and later switch the active selection from the Connections page. Goals use that project-scoped selection when querying the platform.
 
-OAuth refresh tokens are AES-256-GCM encrypted with a master key stored in your OS keychain (via `keytar`) and persisted to your local SQLite.
+OAuth credentials are persisted in the project-scoped `mcp_tokens` table and the catalog MCP is automatically registered with every agent in the project via the chosen harness's config. New agents provisioned later get the same wiring. The credentials are not yet encrypted at the application layer, so protect access to `~/.notfair/db.sqlite` and your local user account.
 
 ## Live transcript
 
@@ -94,7 +96,7 @@ Chat events (deltas, tool calls, lifecycle) are persisted to `transcript_events`
 
 ## What V1 is and isn't
 
-**Is:** the goal loop — conversational goal intake with server-verified metrics, heartbeat ticks with measurement discipline, per-agent memory, shared workspace context — plus per-agent chat, a native cron scheduler, and an MCP connection hub. Runs on Claude Code or Codex, no proprietary agent runtime.
+**Is:** the goal loop — conversational goal intake with server-verified metrics, heartbeat ticks with measurement discipline, per-agent memory, shared workspace context — plus goal chat, PR-governed code changes, and an MCP connection hub. Runs on Claude Code or Codex, no proprietary agent runtime.
 
 **Isn't (yet):** cross-goal coordination (resource leases between agents touching the same campaigns), per-LLM-call cost tracking, or a hosted mode. Those land as the loop earns trust in the field.
 
