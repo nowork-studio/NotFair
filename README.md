@@ -166,13 +166,13 @@ Your data is preserved — the runtime state directory (`~/.toprank/`, holding p
 
 ## The NotFair app — goal-driven marketing agents in your browser
 
-[NotFair](notfair/) is a local web portal built around one idea: state a goal, get a loop. A dedicated agent turns your ambition into a server-verified metric with a measured baseline, you confirm the target, and the agent runs a disciplined improvement cycle on your cadence — the platform measures the number mechanically each tick, the agent scores its past moves against their predictions, and makes at most one new move. Every mutation is logged with an observation window that temporarily gates the affected resources; code changes use a branch and a GitHub pull request that you review and merge. The Goal page shows the whole loop: metric sparkline vs. target, tick diary, open actions with review dates, and the learnings the agent accumulates.
+[NotFair](notfair/) is a local web portal built around one idea: state a goal, get a loop. A dedicated agent turns your ambition into a server-verified metric with a measured baseline, you confirm the target, and the agent runs a disciplined improvement cycle on your cadence — the platform measures the number mechanically each tick, the agent scores its past moves against their predictions, and the goal protocol limits it to one new move. The protocol requires mutations to be logged with observation windows that gate affected resources in future turns; code changes go through a branch and a GitHub pull request for you to review and merge. These are behavioral guardrails for trusted local automation, not an OS-level security sandbox. The Goal page shows the whole loop: metric sparkline vs. target, tick diary, open actions with review dates, and the learnings the agent accumulates.
 
 Open source, runs entirely on your machine, published to npm as [`notfair`](https://www.npmjs.com/package/notfair).
 
 ### Get started
 
-**Prerequisites:** Node 20+ and at least one harness installed and authenticated — [Codex CLI](https://github.com/openai/codex) (recommended) or [Claude Code](https://docs.claude.com/en/docs/agents-and-tools/claude-code/overview).
+**Prerequisites:** An Apple Silicon Mac, Node 20+, and at least one harness installed and authenticated — [Codex CLI](https://github.com/openai/codex) (recommended) or [Claude Code](https://docs.claude.com/en/docs/agents-and-tools/claude-code/overview). The published npm package currently declares support for macOS on ARM64 only.
 
 ```bash
 npx notfair@latest doctor   # preflight: Node, harnesses, data dir, port
@@ -180,6 +180,8 @@ npx notfair@latest          # launch the UI at http://127.0.0.1:3327
 ```
 
 Or install globally with `npm install -g notfair`, then run `notfair`.
+
+The current `doctor` command reports each harness separately and exits non-zero when either Claude Code or Codex is absent, even though the app itself only requires the harness selected for that project.
 
 Create a project, optionally attach a codebase, pick your harness, connect platforms and choose the relevant account during onboarding, then state your first ambition. NotFair creates the goal's agent internally, works out how to measure the goal, and shows you the baseline and target before anything runs. The Codex sidebar reports the signed-in account's plan and usage, while model selectors show the configured model name instead of a generic default label.
 
@@ -243,7 +245,7 @@ notfair/
 ├── .claude-plugin/
 │   ├── plugin.json              <- plugin metadata (explicit skill paths)
 │   └── marketplace.json         <- registry entry
-├── .mcp.json                    <- NotFair MCP servers (Google Ads + Meta Ads, auto-configured)
+├── .mcp.json                    <- NotFair MCP servers (Google Ads + Meta Ads + Search Console)
 ├── google-ads/
 │   ├── manage/                  <- campaign management (skill: google-ads)
 │   ├── audit/                   <- account audit + business context

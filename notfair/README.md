@@ -7,10 +7,10 @@ Open source. Runs entirely on your machine. Bring your own LLM credentials (via 
 ## What it gives you
 
 - **Goals are the identity.** Type the ambition, and you land in a chat where the goal's agent is already working: it sharpens the ask, labels the goal ("Wasted X spend → $0"), authors + tests a metric query against your connected platforms, and the platform *re-runs the query server-side* — only a reproducible number with a measured baseline goes on the books. You agree the target in chat; the loop starts only when you press **START** (and the first tick runs immediately). Two modes: **achieve** (reach the number, done) and **maintain** (hold it there forever — a watchdog).
-- **Platform-focused onboarding.** Connect the data sources a goal needs, choose the relevant account or property, and tag the goal with its platform focus. NotFair keeps the goal scoped to those connections while the anonymous goal agent remains implementation detail.
-- **The tick loop.** On the cadence you agree, the platform measures the metric mechanically (the agent never self-reports the number it's judged on) and wakes the agent: it scores past moves against their predicted effects, then makes at most **one** new move — every mutation logged with a falsifiable expected effect and an observation window that gates its resources until review. The agent's page is the diary: sparkline vs. target, tick-by-tick log, open actions, accumulated memory.
-- **Fully autonomous, visibly so.** No approval inbox — agents act inside a spend envelope you set, with the observation-window discipline and your pause button as the controls, and every move on the record.
-- **Code changes through pull requests.** Attach a GitHub-backed codebase and an agent can work in its own branch, commit and push the change, then register the pull request with NotFair. The app tracks the PR while you retain the merge decision, and only one code mutation stays open for a goal at a time.
+- **Platform-focused onboarding.** Connect the data sources a goal needs, choose the relevant account or property, and tag the goal with its platform focus. The focus guides the intake conversation and metric design; every project connection is still wired to every goal agent.
+- **The tick loop.** On the cadence you agree, the platform measures the metric mechanically (the agent never self-reports the number it's judged on) and wakes the agent: it scores past moves against their predicted effects, then the protocol allows at most **one** new move and requires a log entry with a falsifiable expected effect and observation window. Future goal turns use those records to avoid gated resources until review. The agent's page is the diary: sparkline vs. target, tick-by-tick log, open actions, accumulated memory.
+- **Fully autonomous, visibly so.** No approval inbox — agents are instructed to act inside the spend envelope you set, with observation-window discipline, a pause button for scheduled work, and their recorded moves visible in the app. These are workflow controls for a trusted harness, not a sandbox against arbitrary local commands.
+- **Code changes through pull requests.** Attach a GitHub-backed codebase and an agent can work in its own branch, commit and push the change, then register the pull request with NotFair. The app tracks the PR, while its goal protocol instructs the agent to leave merge decisions to you and keep one code mutation in flight at a time. Those rules are prompt-level guardrails, not mechanically enforced permissions.
 - **Shared context + private memory.** `PROJECT.md` is the workspace brief every agent carries (any agent can update it via `set_shared_context`); each agent also keeps its own learnings ledger and workspace files. All connected MCPs are shared by every agent.
 - **One screen per goal.** The conversation and the loop's state live together: chat on the left (where the goal is defined and steered), a status rail on the right — the progress chart, the plan, every check with its full log, open actions with review dates, and the agent's memory. No tabs, no thread management, nothing else to learn.
 - **Progress you can see.** A time-true chart with the target line, every agent action as a marker on the moment it happened (hover: what it did, what it predicted, what actually happened), observation windows shaded, and history backfilled at setup from the platform's own date-segmented stats — context from day one. Maintain goals get a streak ("held at target for 12 days") with a per-check strip; the workspace index shows a mini sparkline + 7-day delta per goal.
@@ -22,19 +22,20 @@ At onboarding you pick which local AI coding agent runs the work:
 
 | Harness | Status | Notes |
 |---|---|---|
-| **Codex** | Recommended | Uses your existing `codex` login. Per-server env-var bearers. The sidebar reports the authenticated account's plan and usage, and model selectors show the configured model name. Requires `--dangerously-bypass-approvals-and-sandbox` (set by the adapter) so tool calls and loopback reach your local orchestration MCP. |
+| **Codex** | Recommended | Uses your existing `codex` login. Per-server env-var bearers. The sidebar reports the authenticated account's plan and usage, and model selectors show the configured model name. The adapter launches Codex with `--dangerously-bypass-approvals-and-sandbox`; that process inherits the parent environment and can access files available to your local user. Treat goal agents as trusted local automation. |
 | **Claude Code** | Supported | Uses your existing `claude` login. Per-agent `.mcp.json` for isolation. |
 
 Different projects can run on different harnesses; the choice persists on the project row.
 
 ## Prerequisites
 
+- **Apple Silicon Mac.** The published npm package currently declares `darwin`/`arm64` support only.
 - **Node 20+** (Node 24 recommended for native-module prebuilds).
 - **At least one harness installed and authenticated**:
   - [Claude Code](https://docs.claude.com/en/docs/agents-and-tools/claude-code/overview), or
   - [Codex CLI](https://github.com/openai/codex)
 
-Run `notfair doctor` to verify Node, the available harnesses, the data directory, and the port.
+Run `notfair doctor` to check Node, both harness binaries, the data directory, and the port. The current command exits non-zero when either Claude Code or Codex is missing, even though the app itself only needs the harness selected for the project.
 
 ## Install + run
 
@@ -73,7 +74,7 @@ Options on `doctor`: `--port <n>`, `--data-dir <path>`.
 
 ## Code changes through pull requests
 
-Attach a local Git repository to the project in **Settings → Codebase**. When a goal requires source changes, the agent works in a dedicated worktree and branch, commits and pushes its changes, opens a GitHub pull request, and registers it with NotFair. Pull-request state is synchronized back into the goal, but the agent never merges it; review and merge remain with you. An open code observation gate prevents the same goal from starting another code mutation until the pull request is resolved.
+Attach a local Git repository to the project in **Settings → Codebase**. When a goal requires source changes, the agent works in a dedicated worktree and branch, commits and pushes its changes, opens a GitHub pull request, and registers it with NotFair. Pull-request state is synchronized back into the goal. The goal protocol tells the agent not to merge its own PR or begin a second code mutation before the first is resolved, but the unsandboxed harness can technically run those commands; review the branch and PR as you would any other trusted local automation.
 
 ## Connecting MCP servers (for live ad-platform data)
 
