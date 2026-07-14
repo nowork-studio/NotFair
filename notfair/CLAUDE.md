@@ -23,6 +23,10 @@ This repo carries no migrations or legacy/compat code. Verification is:
    Mock at the server-action / db-module boundary (`vi.mock`), not deeper.
    Test pure logic and user-visible component behavior — don't unit-test
    Next.js pages or route handlers; the live smoke covers those.
+   SQLite tests use the real better-sqlite3 against a tmpdir — and the
+   `NOTFAIR_DATA_DIR` override MUST be set inside `vi.hoisted(...)`:
+   static imports evaluate before module-level statements, so a plain
+   assignment points the suite at the developer's live `~/.notfair`.
 3. `pnpm build` — must be clean.
 4. Live smoke: `pnpm dev` (port 3326), then walk the affected flow in the
    browser (goal index → goal page → chat / START / checks).
