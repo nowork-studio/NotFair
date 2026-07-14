@@ -11,6 +11,16 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [0.25.7] — 2026-07-14
+
+### Changed
+
+- Updated the public skill catalog to include the GSC-driven content planner and NotFair upgrade skill, and clarified that compatible coding agents can discover the host-agnostic skills through `AGENTS.md`.
+- Brought the local NotFair app documentation in line with the shipped goal lifecycle, Codex account and model UI, platform selection, pull-request workflow, supported npm platform, and lowercase CLI commands.
+- Documented the app's current trust boundaries accurately: Codex runs as trusted unsandboxed local automation, workflow and pull-request limits are behavioral guardrails, and OAuth credentials are not yet encrypted at the application layer.
+
+---
+
 ## [0.25.6] — 2026-06-04
 
 ### Added
