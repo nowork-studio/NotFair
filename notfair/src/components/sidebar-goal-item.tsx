@@ -60,6 +60,7 @@ export function SidebarGoalItem({
   pinned,
   dotClass,
   labelClass,
+  nested = false,
 }: {
   href: string;
   /** Project home — where the user lands after deleting the open goal. */
@@ -70,6 +71,7 @@ export function SidebarGoalItem({
   pinned: boolean;
   dotClass: string;
   labelClass: string;
+  nested?: boolean;
 }) {
   const router = useRouter();
   const pathname = usePathname();
@@ -112,7 +114,7 @@ export function SidebarGoalItem({
 
   return (
     <SidebarMenuItem>
-      <SidebarMenuButton asChild>
+      <SidebarMenuButton asChild className={nested ? "pl-7" : undefined}>
         <Link href={href}>
           <span className={cn("ns-dot", dotClass)} aria-hidden />
           <span className={cn("truncate", labelClass)}>{label}</span>

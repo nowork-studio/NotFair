@@ -115,7 +115,22 @@ export function parseMetricValue(payload: unknown, depth = 0): number | null {
     const trimmed = payload.trim();
     if (trimmed === "") return null;
     const n = Number(trimmed);
-    return Number.isFinite(n) ? n : null;
+    if (Number.isFinite(n)) return n;
+
+    // CLI-style MCPs may render a one-cell query as a two-line table:
+    //   value
+    //   1.2097
+    // Accept exactly one header plus one numeric data row. Anything wider
+    // or taller remains ambiguous and must be rejected.
+    const lines = trimmed
+      .split(/\r?\n/)
+      .map((line) => line.trim())
+      .filter(Boolean);
+    if (lines.length === 2 && lines[0]?.toLowerCase() === "value") {
+      const tableValue = Number(lines[1]);
+      if (Number.isFinite(tableValue)) return tableValue;
+    }
+    return null;
   }
   if (Array.isArray(payload)) {
     return payload.length === 1 ? parseMetricValue(payload[0], depth + 1) : null;

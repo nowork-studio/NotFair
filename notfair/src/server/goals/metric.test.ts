@@ -37,10 +37,18 @@ describe("parseMetricValue", () => {
     expect(parseMetricValue({ ok: true, result: { value: 9 } })).toBe(9);
   });
 
+  it("accepts a one-column MCP table with one numeric row", () => {
+    expect(parseMetricValue("value\n1.2097")).toBe(1.2097);
+    expect(parseMetricValue("value\r\n1.2097")).toBe(1.2097);
+  });
+
   it("rejects ambiguous payloads", () => {
     expect(parseMetricValue("")).toBeNull();
     expect(parseMetricValue([1, 2])).toBeNull();
     expect(parseMetricValue({ rows: 4 })).toBeNull();
+    expect(parseMetricValue("value\n1\n2")).toBeNull();
+    expect(parseMetricValue("1\n2")).toBeNull();
+    expect(parseMetricValue("not-a-metric\n1")).toBeNull();
   });
 });
 

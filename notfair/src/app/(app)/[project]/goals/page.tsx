@@ -7,6 +7,14 @@ import { getPinnedGoalIds, listGoals } from "@/server/db/goals";
 import { projectHref } from "@/lib/project-href";
 import { goalLabel } from "@/lib/goal-label";
 import { GoalsBoard, type BoardGoal } from "@/components/goals-board";
+import {
+  listGoalGroupMemberships,
+  listGoalGroups,
+  listGoalsInGroup,
+} from "@/server/db/goal-groups";
+import { countGoalGroupHealth } from "@/lib/goal-group-health";
+import { GoalGroupsOverview, type GoalGroupOverviewRow } from "@/components/goal-groups-overview";
+import { GoalGroupEditor, type GoalGroupEditorGoal } from "@/components/goal-group-editor";
 
 export const dynamic = "force-dynamic";
 
@@ -28,10 +36,16 @@ export default async function AllGoalsPage({
   const agents = await listProjectAgents(slug);
   const agentById = new Map(agents.map((a) => [a.agent_id, a]));
   const pinnedIds = getPinnedGoalIds(slug);
+  const projectGoals = listGoals(slug);
+  const groups = listGoalGroups(slug);
+  const membershipByGoal = new Map(
+    listGoalGroupMemberships(slug).map((membership) => [membership.goal_id, membership.group_id]),
+  );
+  const groupById = new Map(groups.map((group) => [group.id, group.name]));
 
   // Plain-JSON card props for the client board. Goals whose agent sidecar
   // is missing (half-deleted workspace) have no page to link to — skip.
-  const goals = listGoals(slug).flatMap<BoardGoal>((g) => {
+  const goals = projectGoals.flatMap<BoardGoal>((g) => {
     const agent = agentById.get(g.agent_id);
     if (!agent) return [];
     return [
@@ -56,6 +70,31 @@ export default async function AllGoalsPage({
     ];
   });
 
+  const groupRows: GoalGroupOverviewRow[] = groups.map((group) => {
+    const members = listGoalsInGroup(group.id);
+    const counts = countGoalGroupHealth(members);
+    return {
+      id: group.id,
+      href: projectHref(slug, `/groups/${group.id}`),
+      name: group.name,
+      description: group.description,
+      goal_count: members.length,
+      healthy_count: counts.healthy,
+      attention_count: counts.attention,
+      waiting_count: counts.waiting + counts.paused,
+    };
+  });
+  const editorGoals: GoalGroupEditorGoal[] = projectGoals.map((goal) => {
+    const groupId = membershipByGoal.get(goal.id) ?? null;
+    return {
+      id: goal.id,
+      label: goalLabel(goal),
+      status: goal.status,
+      current_group_id: groupId,
+      current_group_name: groupId ? groupById.get(groupId) ?? null : null,
+    };
+  });
+
   // Anchored to the viewport region (like the goal screen) so the column
   // strip scrolls inside the page instead of stretching SidebarInset — a
   // flex item with no min-width — and dragging the whole body sideways.
@@ -69,11 +108,22 @@ export default async function AllGoalsPage({
             filter by status, click through for the full story.
           </p>
         </div>
-        <Link href={projectHref(slug, "")} className="ns-btn ns-btn-primary shrink-0">
-          <Plus className="size-3.5" />
-          New goal
-        </Link>
+        <div className="ns-page-actions">
+          <GoalGroupEditor projectSlug={slug} goals={editorGoals} />
+          <Link href={projectHref(slug, "")} className="ns-btn ns-btn-ghost shrink-0">
+            <Plus className="size-3.5" />
+            New goal
+          </Link>
+        </div>
       </header>
+
+      <section className="mb-7" aria-labelledby="goal-groups-heading">
+        <h2 id="goal-groups-heading" className="ns-h2 mt-0">
+          <span>Groups</span>
+          <span className="ns-h2-meta">Dashboards for related goals</span>
+        </h2>
+        <GoalGroupsOverview groups={groupRows} />
+      </section>
 
       {goals.length === 0 ? (
         <div className="ns-card p-8 text-center">

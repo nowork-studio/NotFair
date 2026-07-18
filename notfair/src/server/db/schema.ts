@@ -115,6 +115,31 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_goals_one_live_per_agent
   ON goals(agent_id)
   WHERE status IN ('intake','proposed','active','paused');
 
+-- Goal groups are dashboard/navigation containers. Membership is kept in a
+-- separate table so existing CREATE-IF-NOT-EXISTS databases gain grouping
+-- without altering the goals table. goal_id is the primary key, enforcing
+-- the product rule that one goal belongs to at most one group.
+CREATE TABLE IF NOT EXISTS goal_groups (
+  id           TEXT PRIMARY KEY,
+  project_slug TEXT NOT NULL REFERENCES projects(slug) ON DELETE CASCADE,
+  name         TEXT NOT NULL COLLATE NOCASE,
+  description  TEXT NOT NULL DEFAULT '',
+  sort_order   INTEGER NOT NULL DEFAULT 0,
+  created_at   TEXT NOT NULL,
+  updated_at   TEXT NOT NULL,
+  UNIQUE(project_slug, name)
+);
+CREATE INDEX IF NOT EXISTS idx_goal_groups_project
+  ON goal_groups(project_slug, sort_order, created_at);
+
+CREATE TABLE IF NOT EXISTS goal_group_memberships (
+  goal_id    TEXT PRIMARY KEY REFERENCES goals(id) ON DELETE CASCADE,
+  group_id   TEXT NOT NULL REFERENCES goal_groups(id) ON DELETE CASCADE,
+  created_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_goal_group_memberships_group
+  ON goal_group_memberships(group_id, created_at);
+
 CREATE TABLE IF NOT EXISTS goal_actions (
   id          TEXT PRIMARY KEY,
   goal_id     TEXT NOT NULL REFERENCES goals(id) ON DELETE CASCADE,

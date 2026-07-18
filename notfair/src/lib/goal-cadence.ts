@@ -6,6 +6,7 @@
 export type CadenceOption = { value: string; label: string; hint: string };
 
 export const CADENCE_OPTIONS: CadenceOption[] = [
+  { value: "0 * * * *", label: "Hourly", hint: "every hour" },
   { value: "0 16 * * *", label: "Daily", hint: "every day, 9am PT" },
   { value: "0 16 * * 1-5", label: "Weekdays", hint: "Mon–Fri, 9am PT" },
   { value: "0 */6 * * *", label: "4× daily", hint: "every 6 hours" },
