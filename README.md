@@ -276,6 +276,7 @@ Your data is preserved — the runtime state directory (`~/.toprank/`, holding p
 | [`google-ads-audit`](google-ads/audit/) | Account audit + business context setup. Run this first. Scores 7 health dimensions, identifies wasted spend, builds business profile. |
 | [`google-ads`](google-ads/manage/) | Campaign management. Read performance, optimize keywords, adjust bids/budgets, add negatives, create campaigns. Ask for a **weekly review** and Claude scores every recent change (wins, losses, too-new-to-judge). |
 | [`google-ads-copy`](google-ads/copy/) | RSA copy generator + A/B testing. Data-driven headlines and descriptions with character counts and pin positions. |
+| [`google-ads-assets`](google-ads/assets/) | Asset planner for sitelinks, callouts, snippets, image assets, and reviewable PMax production briefs. Grounds every claim and never overstates MCP upload capability. |
 | [`google-ads-landing`](google-ads/landing/) | Landing page audit. Analyzes relevance between keywords, ads, and landing page content to improve Quality Score. |
 
 #### Meta Ads (Facebook + Instagram)
@@ -284,6 +285,7 @@ Your data is preserved — the runtime state directory (`~/.toprank/`, holding p
 |-------|-------------|
 | [`meta-ads-audit`](meta-ads/audit/) | Account audit + business context setup. Run this first. Scores 7 health dimensions tuned for Meta (Pixel + CAPI Health, Attribution, Campaign Structure, Creative Health, Audience Strategy, Spend Efficiency, Scaling Readiness), persists creative inventory and persona data for downstream skills. |
 | [`meta-ads`](meta-ads/manage/) | Campaign management. ROAS analysis, frequency-first triage, creative fatigue diagnosis, Learning Phase / Learning Limited triage, audience overlap, CBO/ABO/Advantage+ Shopping structure. Mutations route through dedicated tools; operations outside that surface route the user to Meta Ads Manager rather than improvising. |
+| [`meta-ads-creative`](meta-ads/creative/) | Evidence-based Facebook and Instagram creative briefs, copy angles, UGC concepts, and measured refresh experiments. |
 
 #### SEO
 

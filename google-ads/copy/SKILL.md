@@ -47,6 +47,16 @@ For brand-wide rewrites, correlate everything in one pass. For a single ad group
 
 If the user has a CRM or lead-outcome database with the language customers actually use, mine that — customer language beats marketing language every time.
 
+## Copy output contract
+
+Every proposal needs a small decision record, not just a block of headlines:
+
+- A **concept ID** and one-sentence hypothesis: `persona × motivation × angle`.
+- A **claim ledger** for every proof, offer, rating, guarantee, price, or superlative: exact source (account data, business context, approved landing page, or user-provided evidence) and whether it is approved for ad use.
+- Complete RSA assets with character counts and pin positions, plus a distinct challenger concept when testing.
+
+Do not turn a vague request into fabricated proof. If a claim is attractive but unsupported, label it `needs_substantiation` and write a claim-free alternative. A citation to a competitor, an unverified review site, or general industry knowledge is not approval to use a claim in an ad.
+
 ## Competitive copy rules
 
 - **Never** name a competitor in ad copy (policy risk + you do their brand awareness for free).
@@ -71,7 +81,7 @@ Each variant must test a **meaningfully different angle** — not word swaps. "T
 
 Before writing variants, read `references/rsa-testing-lab.md` when the request mentions testing, pinning, Ad Strength, low CTR/CVR, or mixed-intent ad groups. It encodes the generalized pattern that many RSA problems are really ad-group/query-theme problems.
 
-When calling a winner, the underlying question is the same regardless of mechanism: did the variant win on conversion rate (or CPA), backed by enough sample to trust the difference? Less than ~100 clicks per variant is too early. ≥20% relative CTR or CVR delta is meaningful. 2× CVR gap is decisive immediately. The experiments framework's own significance signals are the cleanest input — defer to them when present.
+Before launch, record one primary metric, any guardrail metric (for example CPA or qualified-lead rate), the planned minimum exposure or duration, and the decision rule. Do not peek and declare a winner from an early gap: less than ~100 clicks per variant is usually too early, and even a 2× CVR gap still needs enough conversions and a check for recent changes. The experiment framework's own significance signals are the cleanest input — defer to them when present.
 
 After a winner: pause the loser, then iterate against the winner. Never stop testing.
 

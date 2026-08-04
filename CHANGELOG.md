@@ -9,6 +9,14 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+### Added
+
+- **Evidence-based ads creative and assets (v0.25.10).** Added `/google-ads-assets` for reviewable extension, image-asset, and PMax production briefs, and `/meta-ads-creative` for grounded Facebook/Instagram concept slates and refresh tests. Both distinguish an approved brief from a published asset and keep unsupported claims, rights, and MCP capability boundaries explicit.
+
+### Changed
+
+- **`/google-ads-copy` now records concepts and claim sources,** requires unsupported proof to be marked for substantiation, and makes test decisions from pre-set metrics and adequate exposure rather than early conversion-rate gaps.
+
 ---
 
 ## [0.25.9] — 2026-07-21

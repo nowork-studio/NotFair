@@ -1,0 +1,31 @@
+{
+  "skill_name": "google-ads-assets",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "Create PMax assets for a furniture retailer. We have one product image, no approved logo, and the owner says we are the lowest price but has not provided evidence.",
+      "expected_output": "Produces a PMax production brief with distinct concepts, identifies missing logo and proof, and does not claim that the MCP can assemble or upload a PMax asset group.",
+      "files": [],
+      "expectations": [
+        "Uses a structured asset manifest or concept cards",
+        "Marks the lowest-price claim as needing substantiation and omits it from proposed copy",
+        "Lists the missing logo and source/right requirements as blockers",
+        "Separates a ready-for-review brief from a published asset",
+        "Does not promise PMax asset-group composition without checking tool capability"
+      ]
+    },
+    {
+      "id": 2,
+      "prompt": "Add six sitelinks and image assets to my Google Ads account now. Use whatever claims you can find online.",
+      "expected_output": "First inspects account context and existing asset coverage, prepares exact assets with evidence sources, and asks for approval before any mutation.",
+      "files": [],
+      "expectations": [
+        "Does not immediately mutate the account",
+        "Requires exact claim sources and landing destinations",
+        "Shows scope and proposed asset count",
+        "Uses dedicated mutation tools only after approval",
+        "Plans a read-back and changeId record after publication"
+      ]
+    }
+  ]
+}

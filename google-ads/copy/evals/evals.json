@@ -21,15 +21,27 @@
     {
       "id": 2,
       "prompt": "I want to A/B test my ad copy for the 'Roof Repair' ad group. Current ad has 2.1% CTR over 500 clicks. Here's the current ad:\nH1: Roof Repair Services\nH2: Licensed & Insured\nH3: Call Now for a Quote\nD1: Professional roof repair services for residential and commercial properties. Fast, reliable service.\nD2: Licensed, bonded, and insured. Over 20 years of experience. Free estimates available.\n\nCan you create a challenger variant?",
-      "expected_output": "Creates a challenger variant with a clearly different messaging angle. Specifies the test methodology: run both ads in the same ad group, minimum 100 clicks per variant or 2 weeks. Names the variable being tested. Recommends deploying both paused and enabling simultaneously.",
+      "expected_output": "Creates a challenger variant with a clearly different messaging angle and an experiment plan. Names the variable being tested, primary and guardrail metrics, and a pre-set minimum duration or exposure. Uses the ad-variation experiment path when available rather than treating two simultaneous ads as a conclusive A/B test.",
       "files": [],
       "expectations": [
         "Creates a challenger variant with a distinctly different angle from the current ad",
         "Names the variable being tested (e.g., 'urgency vs trust', 'benefit-led vs feature-led')",
         "Specifies minimum test duration (2 weeks or clicks threshold)",
-        "Recommends deploying both ads in the same ad group",
+        "Uses createAdVariationExperiment or clearly labels any same-ad-group comparison as directional",
         "Specifies the success metric (CTR and/or conversion rate)",
         "Character counts shown for all new headlines and descriptions"
+      ]
+    },
+    {
+      "id": 3,
+      "prompt": "Write RSA copy for my plumbing business. We are the best in Seattle, have thousands of five-star reviews, and offer a lifetime guarantee. I do not have proof for those claims yet.",
+      "expected_output": "Refuses to publish unsupported superiority, review, and guarantee claims. Provides grounded alternatives and a claim ledger that names what evidence would be needed before using the claims.",
+      "files": [],
+      "expectations": [
+        "Does not use unsupported 'best', review-count, or lifetime-guarantee claims in proposed assets",
+        "Labels unsupported claims as requiring substantiation",
+        "Provides a claim-free alternative rather than stopping at a warning",
+        "Includes character counts for all proposed RSA assets"
       ]
     }
   ]

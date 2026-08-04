@@ -48,6 +48,7 @@ Skills under `seo/`, `google-ads/`, `meta-ads/`, `gemini/`, and `notfair-upgrade
 | First-time setup or account health check | `google-ads-audit` | `google-ads/audit/SKILL.md` |
 | Performance, keywords, bids, budgets, negatives, experiments, bulk ops | `google-ads` | `google-ads/manage/SKILL.md` |
 | Write ad copy, RSA headlines/descriptions, A/B variants | `google-ads-copy` | `google-ads/copy/SKILL.md` |
+| Google Ads assets, extensions, sitelinks, callouts, image assets, PMax asset briefs | `google-ads-assets` | `google-ads/assets/SKILL.md` |
 | Landing-page quality, ad-to-page match, LPX diagnosis | `google-ads-landing` | `google-ads/landing/SKILL.md` |
 
 ## Meta Ads
@@ -56,6 +57,7 @@ Skills under `seo/`, `google-ads/`, `meta-ads/`, `gemini/`, and `notfair-upgrade
 |---|---|---|
 | First-time Meta setup or account health check | `meta-ads-audit` | `meta-ads/audit/SKILL.md` |
 | Facebook/Instagram performance, ROAS, CPM, creative fatigue, audience overlap | `meta-ads` | `meta-ads/manage/SKILL.md` |
+| Facebook/Instagram ad creative, copy angles, UGC concepts, asset briefs, creative refreshes | `meta-ads-creative` | `meta-ads/creative/SKILL.md` |
 
 ## Cross-model review
 
