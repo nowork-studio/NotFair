@@ -1,0 +1,4 @@
+interface:
+  display_name: "Amazon Ads Planning"
+  short_description: "Plan Amazon Ads with margin-aware ACoS targets"
+  default_prompt: "Use $paid-ads-amazon to plan Amazon Ads or evaluate an Amazon performance export."

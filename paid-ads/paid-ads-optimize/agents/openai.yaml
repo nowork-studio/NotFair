@@ -1,0 +1,4 @@
+interface:
+  display_name: "Paid Ads Optimization"
+  short_description: "Find waste and propose evidence-backed changes"
+  default_prompt: "Use $paid-ads-optimize to identify wasted spend and review safe optimizations."

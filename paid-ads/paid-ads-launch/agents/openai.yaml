@@ -1,0 +1,4 @@
+interface:
+  display_name: "Paid Ads Launch"
+  short_description: "Plan a measurable campaign before it can spend"
+  default_prompt: "Use $paid-ads-launch to plan a new campaign and prepare its approval brief."

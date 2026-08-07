@@ -1,0 +1,4 @@
+interface:
+  display_name: "TikTok Ads Planning"
+  short_description: "Plan TikTok campaigns with measurement guardrails"
+  default_prompt: "Use $paid-ads-tiktok to prepare a TikTok campaign or creative test."

@@ -1,0 +1,4 @@
+interface:
+  display_name: "Paid Ads Review"
+  short_description: "Produce an evidence-based cross-channel scorecard"
+  default_prompt: "Use $paid-ads-review to review ad performance across connected platforms."

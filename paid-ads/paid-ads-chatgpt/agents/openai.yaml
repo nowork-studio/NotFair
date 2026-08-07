@@ -1,0 +1,4 @@
+interface:
+  display_name: "ChatGPT Ads Planning"
+  short_description: "Plan ChatGPT Ads experiments without unsupported claims"
+  default_prompt: "Use $paid-ads-chatgpt to plan a ChatGPT Ads experiment or review its results."

@@ -12,7 +12,7 @@ If you are an agent and a user mentions Google Ads, Meta Ads, SEO, GEO, or anyth
 2. **Read the named skill's `SKILL.md`** from the path shown.
 3. **Follow the procedure** in that SKILL.md exactly.
 
-Skills under `seo/`, `google-ads/`, `meta-ads/`, `gemini/`, and `notfair-upgrade-skill/` are **host-agnostic** — they work the same on every supported agent host.
+Skills under `seo/`, `paid-ads/`, `google-ads/`, `meta-ads/`, `gemini/`, and `notfair-upgrade-skill/` are **host-agnostic** — they work the same on every supported agent host.
 
 ---
 
@@ -40,6 +40,23 @@ Skills under `seo/`, `google-ads/`, `meta-ads/`, `gemini/`, and `notfair-upgrade
 | SEO drift / regression monitoring, baseline & compare over time | `seo-drift` | `seo/seo-drift/SKILL.md` |
 | Backlink / off-page audit, anchor text, referring domains, disavow | `backlink-audit` | `seo/backlink-audit/SKILL.md` |
 | Connect WordPress, Strapi, Contentful, or Ghost | `setup-cms` | `seo/setup-cms/SKILL.md` |
+
+## Paid Ads
+
+| Intent | Skill | Path |
+|---|---|---|
+| Broad ads question, cross-channel strategy, budget, CPA/ROAS, or route to the right workflow | `paid-ads` | `paid-ads/paid-ads/SKILL.md` |
+| How NotFair paid ads works, install, plan/limit, supported platforms, or product troubleshooting | `paid-ads-guide` | `paid-ads/paid-ads-guide/SKILL.md` |
+| Connect an account, establish marketing context, or refresh a paid-media workspace | `paid-ads-setup` | `paid-ads/paid-ads-setup/SKILL.md` |
+| Check connector access, tools, or supported platform capabilities | `paid-ads-integrations` | `paid-ads/paid-ads-integrations/SKILL.md` |
+| Plan a new campaign or multi-channel experiment before it can spend | `paid-ads-launch` | `paid-ads/paid-ads-launch/SKILL.md` |
+| Weekly/monthly performance report, scorecard, pacing, or tracking health | `paid-ads-review` | `paid-ads/paid-ads-review/SKILL.md` |
+| Wasted spend, budget allocation, overspend, or safe optimization proposal | `paid-ads-optimize` | `paid-ads/paid-ads-optimize/SKILL.md` |
+| Cross-channel copy, creative concepts, fatigue diagnosis, or test briefs | `paid-ads-creative` | `paid-ads/paid-ads-creative/SKILL.md` |
+| LinkedIn Ads plan or export-based review | `paid-ads-linkedin` | `paid-ads/paid-ads-linkedin/SKILL.md` |
+| TikTok Ads plan, creator brief, or export-based review | `paid-ads-tiktok` | `paid-ads/paid-ads-tiktok/SKILL.md` |
+| Amazon Ads plan, ACoS review, ASIN targeting, or export-based review | `paid-ads-amazon` | `paid-ads/paid-ads-amazon/SKILL.md` |
+| ChatGPT Ads experiment plan or verified-export review | `paid-ads-chatgpt` | `paid-ads/paid-ads-chatgpt/SKILL.md` |
 
 ## Google Ads
 
@@ -77,6 +94,8 @@ Skills under `seo/`, `google-ads/`, `meta-ads/`, `gemini/`, and `notfair-upgrade
 - **Google Ads (NotFair MCP)** — `https://notfair.co/api/mcp/google_ads`, OAuth. Required for Google Ads skills.
 - **Meta Marketing API (NotFair MCP)** — required for Meta Ads skills.
 - **Google Gemini API key** — required for `gemini`.
+
+LinkedIn, TikTok, Amazon, and ChatGPT Ads skills are planning/review workflows unless the current session exposes a verified connector. They do not imply account or mutation access.
 
 Skills check for missing credentials at startup and walk the user through setup. Do not invent credentials or skip skills silently — surface the gap.
 

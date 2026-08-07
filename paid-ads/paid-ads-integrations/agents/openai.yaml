@@ -1,0 +1,4 @@
+interface:
+  display_name: "Paid Ads Integrations"
+  short_description: "Resolve NotFair connector capabilities and access"
+  default_prompt: "Use $paid-ads-integrations to connect an ad platform or verify what NotFair can do."

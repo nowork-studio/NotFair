@@ -1,0 +1,4 @@
+interface:
+  display_name: "Paid Ads Setup"
+  short_description: "Connect accounts and capture paid-media context"
+  default_prompt: "Use $paid-ads-setup to connect NotFair and prepare a paid-media workspace."

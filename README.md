@@ -36,6 +36,12 @@ No approval inbox, no task board, no thread management. You chat with a goal whe
 3. **You confirm the plan — the loop starts on the spot.** The agent reports the baseline and proposes a target, cadence, and spend envelope. The moment you confirm in chat, the goal goes live and the first check runs immediately. Two modes: **achieve** (reach the number, then done) and **maintain** (hold it there forever — a watchdog).
 4. **The loop runs on your cadence.** Each check, the platform measures the metric mechanically (the agent never self-reports the number it's judged on) and wakes the agent: it reviews past moves against their predicted effects, records what it learned, and the goal protocol allows at most **one** new move — logged with a falsifiable expected effect and an observation window that gates the touched resources until review.
 
+## Make SEO and paid ads improve automatically
+
+Use one NotFair goal for the measurable business outcome — organic clicks, qualified leads, profitable revenue, or a CPA/ROAS boundary — then connect the data source that can prove it. The agent establishes a server-verified baseline, makes a focused improvement plan, and rechecks the outcome on the cadence you approve. SEO work can become reviewable code changes in a connected repository; paid-media work stays inside the spend envelope and approval boundaries you set.
+
+That makes the loop practical rather than theatrical: it catches an SEO regression before it becomes a quarter of lost traffic, distinguishes a creative-freshness problem from a targeting problem, and records whether an approved change did what it predicted. Use the plugin skills below for hands-on audits and campaign work, or create a goal when you want a durable, measured improvement loop.
+
 ## What you get
 
 - **One screen per goal.** Chat on the left (where the goal is defined and steered), the loop's state on the right: a time-true progress chart with the target line, every action as a marker on the moment it happened, a tick-by-tick check diary, open actions with review dates, and the agent's accumulated memory.
@@ -269,6 +275,25 @@ Your data is preserved — the runtime state directory (`~/.toprank/`, holding p
 
 ### Skills
 
+#### Paid Ads — cross-channel planning and review
+
+| Skill | What it does |
+|-------|-------------|
+| [`paid-ads`](paid-ads/paid-ads/) | The cross-channel entry point. Routes broad strategy, budget, CPA/ROAS, and platform requests to the right NotFair workflow while keeping spend changes explicit. |
+| [`paid-ads-guide`](paid-ads/paid-ads-guide/) | Explains installation, capability boundaries, connections, and where to get current answers on plans and platform limits. |
+| [`paid-ads-setup`](paid-ads/paid-ads-setup/) | Connects accounts and captures the product, economics, claim, tracking, and budget context an agent needs to make useful recommendations. |
+| [`paid-ads-launch`](paid-ads/paid-ads-launch/) | Turns a goal into a reviewable launch brief: measurement, structure, spend ceiling, message chain, experiment, and readiness checks. |
+| [`paid-ads-review`](paid-ads/paid-ads-review/) | Produces a comparable, read-only weekly or monthly scorecard instead of blending incompatible platform numbers. |
+| [`paid-ads-optimize`](paid-ads/paid-ads-optimize/) | Finds credible waste and pacing problems, then proposes narrow, reversible changes with a review date. |
+| [`paid-ads-creative`](paid-ads/paid-ads-creative/) | Builds grounded creative concepts, claim ledgers, refresh hypotheses, and test plans for every channel. |
+| [`paid-ads-linkedin`](paid-ads/paid-ads-linkedin/) | Plans B2B LinkedIn campaigns around qualified-lead feedback, not vanity form fills. |
+| [`paid-ads-tiktok`](paid-ads/paid-ads-tiktok/) | Creates short-form creative experiments with measurement, rights, and operator handoff built in. |
+| [`paid-ads-amazon`](paid-ads/paid-ads-amazon/) | Plans and reviews Amazon Ads with margin-aware ACoS and product/search-term guardrails. |
+| [`paid-ads-chatgpt`](paid-ads/paid-ads-chatgpt/) | Designs bounded conversational-ad experiments without claiming unsupported inventory or account access. |
+| [`paid-ads-integrations`](paid-ads/paid-ads-integrations/) | Verifies which platform tools and accounts the current session can actually use before an agent promises a read or write. |
+
+Google Ads and Meta Ads have first-party NotFair MCP operating surfaces, so those requests route into the specialized skills below. The LinkedIn, TikTok, Amazon, and ChatGPT skills are deliberately plan/review-first unless a verified connector is available in the current session.
+
 #### Google Ads
 
 | Skill | What it does |
@@ -324,7 +349,7 @@ Your data is preserved — the runtime state directory (`~/.toprank/`, holding p
 |-------|-------------|
 | [`upgrade`](notfair-upgrade-skill/) | Updates an installed NotFair plugin to the latest marketplace release and summarizes what changed. |
 
-All skills are namespaced: `/notfair:google-ads`, `/notfair:seo-analysis`, `/notfair:gemini`, etc.
+All skills are namespaced: `/notfair:paid-ads`, `/notfair:google-ads`, `/notfair:seo-analysis`, `/notfair:gemini`, etc.
 
 ---
 
@@ -339,6 +364,7 @@ notfair/
 │   └── marketplace.json         <- registry entry
 ├── .mcp.json                    <- NotFair MCP servers (Google Ads + Meta Ads + Search Console)
 ├── notfair/                     <- the goal-loop app (npm: notfair)
+├── paid-ads/                    <- cross-channel paid-media planning, review, and safety skills
 ├── google-ads/
 │   ├── manage/                  <- campaign management (skill: google-ads)
 │   ├── audit/                   <- account audit + business context

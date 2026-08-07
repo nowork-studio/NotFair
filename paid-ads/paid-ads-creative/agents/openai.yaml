@@ -1,0 +1,4 @@
+interface:
+  display_name: "Paid Ads Creative"
+  short_description: "Build evidence-backed creative concepts and tests"
+  default_prompt: "Use $paid-ads-creative to create grounded paid-ad creative and a test plan."

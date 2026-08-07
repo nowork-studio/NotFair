@@ -11,6 +11,8 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ### Added
 
+- **Cross-channel paid-ads skills (v0.25.11).** Added an evidence-first paid-media router plus guide, setup, integration, launch, review, optimization, creative, LinkedIn, TikTok, Amazon, and ChatGPT Ads workflows. Google and Meta requests route to the established NotFair operator skills; platforms without a declared NotFair MCP surface remain explicitly plan/review-only until a verified connector is available. Every workflow carries shared approval, measurement, and publication-status guardrails.
+
 - **Evidence-based ads creative and assets (v0.25.10).** Added `/google-ads-assets` for reviewable extension, image-asset, and PMax production briefs, and `/meta-ads-creative` for grounded Facebook/Instagram concept slates and refresh tests. Both distinguish an approved brief from a published asset and keep unsupported claims, rights, and MCP capability boundaries explicit.
 
 ### Changed

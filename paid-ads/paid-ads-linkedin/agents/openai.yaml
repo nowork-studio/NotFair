@@ -1,0 +1,4 @@
+interface:
+  display_name: "LinkedIn Ads Planning"
+  short_description: "Plan LinkedIn campaigns without inventing platform access"
+  default_prompt: "Use $paid-ads-linkedin to prepare a LinkedIn campaign or review its performance."

@@ -47,6 +47,18 @@ assert_not_contains() {
 # SKILL.md frontmatter `name:` field, which becomes the slash command tail
 # after the `notfair:` plugin prefix (e.g. `name: upgrade` → `/notfair:upgrade`).
 SKILL_ENTRIES=(
+  "paid-ads:paid-ads/paid-ads"
+  "paid-ads-guide:paid-ads/paid-ads-guide"
+  "paid-ads-setup:paid-ads/paid-ads-setup"
+  "paid-ads-integrations:paid-ads/paid-ads-integrations"
+  "paid-ads-launch:paid-ads/paid-ads-launch"
+  "paid-ads-review:paid-ads/paid-ads-review"
+  "paid-ads-optimize:paid-ads/paid-ads-optimize"
+  "paid-ads-creative:paid-ads/paid-ads-creative"
+  "paid-ads-linkedin:paid-ads/paid-ads-linkedin"
+  "paid-ads-tiktok:paid-ads/paid-ads-tiktok"
+  "paid-ads-amazon:paid-ads/paid-ads-amazon"
+  "paid-ads-chatgpt:paid-ads/paid-ads-chatgpt"
   "google-ads:google-ads/manage"
   "google-ads-audit:google-ads/audit"
   "google-ads-copy:google-ads/copy"
@@ -170,7 +182,7 @@ for entry in "${SKILL_ENTRIES[@]}"; do
 done
 
 # Guard: actual SKILL.md count must match
-actual_skill_count=$(find "$REPO_ROOT/google-ads" "$REPO_ROOT/seo" "$REPO_ROOT/meta-ads" "$REPO_ROOT/notfair-upgrade-skill" "$REPO_ROOT/gemini" -name "SKILL.md" | wc -l | tr -d ' ')
+actual_skill_count=$(find "$REPO_ROOT/paid-ads" "$REPO_ROOT/google-ads" "$REPO_ROOT/seo" "$REPO_ROOT/meta-ads" "$REPO_ROOT/notfair-upgrade-skill" "$REPO_ROOT/gemini" -name "SKILL.md" | wc -l | tr -d ' ')
 if [ "$actual_skill_count" -ne "${#SKILL_ENTRIES[@]}" ]; then
   fail "Expected ${#SKILL_ENTRIES[@]} SKILL.md files but found $actual_skill_count"
 else

@@ -1,0 +1,4 @@
+interface:
+  display_name: "Paid Ads"
+  short_description: "Coordinate safe cross-channel paid-media work"
+  default_prompt: "Use $paid-ads to assess paid-media performance or route a campaign request."

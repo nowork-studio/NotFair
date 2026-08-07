@@ -1,0 +1,4 @@
+interface:
+  display_name: "NotFair Paid Ads Guide"
+  short_description: "Explain NotFair paid-ads setup and limits"
+  default_prompt: "Use $paid-ads-guide to explain how NotFair paid-ads skills work."
