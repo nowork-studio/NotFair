@@ -9,7 +9,7 @@ import tempfile
 import urllib.request
 import urllib.error
 
-from _gcloud import gcloud_run
+from _gcloud import adc_access_token, gcloud_run
 from _uid import portable_uid, secure_write_json
 
 
@@ -31,10 +31,7 @@ def get_quota_project():
 
 def get_access_token():
     try:
-        result = gcloud_run(
-            ["gcloud", "auth", "application-default", "print-access-token"],
-            capture_output=True, text=True, timeout=15
-        )
+        result = adc_access_token()
     except FileNotFoundError:
         print("ERROR: gcloud not found. Install it and authenticate:", file=sys.stderr)
         print("  https://cloud.google.com/sdk/docs/install", file=sys.stderr)
