@@ -1,6 +1,6 @@
 {
   "name": "notfair-nextjs-blog",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "description": "Render your NotFair SEO exchange posts on a Next.js blog — server-side content pulls with your private site API key.",
   "license": "MIT",
   "type": "module",
