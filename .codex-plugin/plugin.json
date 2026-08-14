@@ -1,0 +1,41 @@
+{
+  "name": "notfair",
+  "version": "0.27.0",
+  "description": "The official ads, analytics, SEO, and GEO plugin from NotFair.",
+  "author": {
+    "name": "NotFair",
+    "url": "https://www.notfair.co"
+  },
+  "homepage": "https://www.notfair.co",
+  "repository": "https://github.com/nowork-studio/notfair-plugin",
+  "license": "MIT",
+  "keywords": [
+    "advertising",
+    "analytics",
+    "google-ads",
+    "marketing",
+    "seo"
+  ],
+  "skills": "./skills/",
+  "mcpServers": "./.mcp.json",
+  "interface": {
+    "displayName": "NotFair",
+    "shortDescription": "Operate ads and analyze search performance.",
+    "longDescription": "Connect once to operate Google, Meta, X, and LinkedIn Ads, analyze GA4 and Search Console, and use open-source SEO and GEO workflows.",
+    "developerName": "NotFair",
+    "category": "Productivity",
+    "capabilities": [
+      "Interactive",
+      "Write"
+    ],
+    "websiteURL": "https://www.notfair.co",
+    "privacyPolicyURL": "https://www.notfair.co/privacy",
+    "termsOfServiceURL": "https://www.notfair.co/terms",
+    "defaultPrompt": [
+      "Audit my Google Ads account and find wasted spend.",
+      "Review my paid media performance across channels.",
+      "Find my strongest SEO and content opportunities."
+    ],
+    "brandColor": "#111827"
+  }
+}

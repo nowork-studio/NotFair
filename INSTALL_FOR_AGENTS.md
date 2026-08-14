@@ -24,11 +24,9 @@ If you cannot determine the host, ask the user once and proceed.
 
 ---
 
-## Step 2 — Acquire the repo
+## Step 2 — Acquire the repo when the host needs a workspace checkout
 
-If the NotFair repo is already on disk locally, use it; do not re-clone.
-
-Otherwise:
+Codex and Claude Code install directly from the marketplace in Step 3 and can skip this checkout. For Hermes and generic agents, use an existing local NotFair repo or clone it:
 
 ```bash
 git clone https://github.com/nowork-studio/notfair-plugin.git
@@ -52,16 +50,19 @@ Then verify by listing installed plugins. No further action required — Claude 
 
 ### host = `codex`
 
-Codex reads `AGENTS.md` natively. From the repo root:
+Install the public plugin through Codex:
 
 ```bash
-# Codex auto-discovers AGENTS.md at the workspace root.
-codex --workspace .
+codex plugin marketplace add nowork-studio/notfair-plugin --json && codex plugin add notfair@nowork-studio --json && codex mcp login NotFair
 ```
 
-NotFair's skills live under `seo/`, `google-ads/`, `meta-ads/`, `gemini/`. Codex reads `AGENTS.md` and routes user intents to the named skills' `SKILL.md` files.
+If Codex reports that `nowork-studio` is already configured, refresh it and continue:
 
-> **Note:** A dedicated Codex install adapter (`install/codex/`) may be added in future versions to register skills into Codex's global skill directory. For now, workspace-local usage is the supported path.
+```bash
+codex plugin marketplace upgrade nowork-studio --json && codex plugin add notfair@nowork-studio --json && codex mcp login NotFair
+```
+
+Verify that `notfair@nowork-studio` is installed and `codex mcp list` reports `NotFair` as authenticated. The plugin's Codex manifest loads its skills and one universal NotFair MCP connection; do not add the dedicated platform MCP endpoints separately.
 
 ### host = `hermes`
 
@@ -82,11 +83,12 @@ Read `AGENTS.md` at the repo root. It contains the full intent → skill routing
 
 ## Step 4 — Connect external services
 
+The plugin registers one universal NotFair MCP server at `https://notfair.co/api/mcp/notfair_ads`. The Codex install command above explicitly starts its native OAuth flow; other hosts prompt on install or first use. The user signs in once and selects a NotFair workspace. During the staged Google-first rollout, enabled workspaces also connect Google Ads when they do not already have an active account. Google Ads, Meta Ads, X Ads, LinkedIn Ads, Search Console, and Google Analytics then appear as platform-prefixed tools through that one connection.
+
 NotFair skills depend on external APIs. Walk the user through whichever they need:
 
-- **Google Search Console** — required for any SEO skill that reads live ranking data. The skills will prompt for OAuth on first run.
-- **Google Ads** — connects via the NotFair MCP server at `https://notfair.co/api/mcp/google_ads` (OAuth). The user signs in once at notfair.co; the MCP handles the rest.
-- **Meta Ads (Facebook + Instagram)** — connects via the NotFair MCP server. Same OAuth flow.
+- **Google Ads** — connected in the same first-run flow for workspaces enabled in the staged Google-first rollout; otherwise connect it in NotFair.
+- **Google Search Console, Google Analytics, Meta Ads, X Ads, and LinkedIn Ads** — available through the same MCP after each platform is connected in the selected NotFair workspace.
 - **Google Gemini** — required only for the `gemini` skill. Needs a Gemini API key in environment.
 
 Do **not** invent credentials. If a skill needs auth that isn't present, surface the gap and walk the user through the connection flow.

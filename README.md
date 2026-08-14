@@ -58,11 +58,23 @@ You can also use plain language:
 
 ### Codex, Hermes, and other agents
 
-The NotFair Plugin's skill source is host-agnostic. Clone the repository and open it as a workspace; [`AGENTS.md`](AGENTS.md) maps marketing requests to the right skill.
+Install the universal NotFair plugin directly through Codex:
+
+```bash
+codex plugin marketplace add nowork-studio/notfair-plugin --json && codex plugin add notfair@nowork-studio --json && codex mcp login NotFair
+```
+
+Codex installs the skills, registers one NotFair MCP connection, and opens its OAuth flow. If you prefer a workspace-local checkout, clone the repository and open it as a workspace; [`AGENTS.md`](AGENTS.md) maps marketing requests to the right skill.
 
 ```bash
 git clone https://github.com/nowork-studio/notfair-plugin.git
 cd notfair-plugin
+```
+
+If the `nowork-studio` marketplace is already configured, refresh it instead:
+
+```bash
+codex plugin marketplace upgrade nowork-studio --json && codex plugin add notfair@nowork-studio --json && codex mcp login NotFair
 ```
 
 For host-specific setup, give your agent [`INSTALL_FOR_AGENTS.md`](INSTALL_FOR_AGENTS.md), or paste:
@@ -161,16 +173,16 @@ Marketing work gets unreliable when every request goes through the same vague pr
 
 ## Live data and integrations
 
-Some skills work entirely from a repository, URL, or supplied export. Live account analysis requires the relevant connection.
+Some skills work entirely from a repository, URL, or supplied export. Live account analysis uses one OAuth-connected [universal NotFair MCP](https://notfair.co/api/mcp/notfair_ads). The plugin registers that connection automatically. During the staged Google-first rollout, enabled workspaces connect Google Ads in the same OAuth flow; every other platform becomes available after it is connected in the selected NotFair workspace.
 
 | Data source | Used for | Connection |
 |---|---|---|
-| **Google Search Console** | Search performance, queries, pages, indexing, URL inspection, and sitemaps | [NotFair Search Console MCP](https://notfair.co/api/mcp/google_search_console) via OAuth |
-| **Google Analytics 4** | Acquisition, engagement, landing pages, events, conversions, realtime, and measurement configuration | [NotFair Google Analytics MCP](https://notfair.co/api/mcp/google_analytics) via OAuth |
-| **Google Ads** | Campaign performance, search terms, bids, budgets, keywords, and change history | [NotFair Google Ads MCP](https://notfair.co) via OAuth |
-| **Meta Ads** | Facebook and Instagram campaigns, ad sets, creatives, and insights | [NotFair Meta Ads MCP](https://notfair.co) via OAuth |
-| **X Ads** | Campaigns, line items, performance, targeting, promoted posts, audiences, and approved mutations | [NotFair X Ads MCP](https://notfair.co/api/mcp/x_ads) via OAuth |
-| **LinkedIn Ads** | Campaign groups, campaigns, creatives, analytics, targeting, conversions, and leads | [NotFair LinkedIn Ads MCP](https://notfair.co/api/mcp/linkedin_ads) via OAuth |
+| **Google Search Console** | Search performance, queries, pages, indexing, URL inspection, and sitemaps | Universal NotFair MCP via `search_console_` tools |
+| **Google Analytics 4** | Acquisition, engagement, landing pages, events, conversions, realtime, and measurement configuration | Universal NotFair MCP via `google_analytics_` tools |
+| **Google Ads** | Campaign performance, search terms, bids, budgets, keywords, and change history | Universal NotFair MCP via `google_ads_` tools |
+| **Meta Ads** | Facebook and Instagram campaigns, ad sets, creatives, and insights | Universal NotFair MCP via `meta_ads_` tools |
+| **X Ads** | Campaigns, line items, performance, targeting, promoted posts, audiences, and approved mutations | Universal NotFair MCP via `x_ads_` tools |
+| **LinkedIn Ads** | Campaign groups, campaigns, creatives, analytics, targeting, conversions, and leads | Universal NotFair MCP via `linkedin_ads_` tools |
 | **CMS platforms** | Content and SEO-field review in WordPress, Strapi, Contentful, or Ghost | Platform API or compatible MCP |
 | **Google Gemini** | Cross-model review | Gemini API key |
 

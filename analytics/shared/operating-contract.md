@@ -2,7 +2,7 @@
 
 Read this before using Search Console or Google Analytics data.
 
-1. Discover the requested platform's actual connector and harmlessly confirm the selected property. Do not treat another NotFair connector as proof of access.
+1. Discover the requested platform's actual tool prefix and harmlessly confirm the selected property. On the universal NotFair connector, call `listConnectedPlatforms` first and treat only the requested platform's prefixed tools as proof of access.
 2. State the property, timezone, source, date window, comparison window, dimensions, filters, and metric or conversion definition beside material findings.
 3. Prefer one broad, batched read over repeated narrow calls. Respect the tool's current quota and fan-out limits rather than copying limits from another platform.
 4. Separate observed facts, inferences, and recommendations. State freshness, sampling, thresholding, row caps, attribution, or tracking limitations.

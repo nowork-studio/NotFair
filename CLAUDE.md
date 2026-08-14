@@ -20,6 +20,7 @@ NotFair is a host-agnostic plugin providing SEO, Google Ads, and Meta Ads skills
 
 - **`AGENTS.md`** — the universal skill resolver. Every host reads this to route user intents to the right skill. Update it whenever a skill is added, removed, or its purpose changes.
 - **`INSTALL_FOR_AGENTS.md`** — the single paste-URL target that walks an AI agent through host detection and install.
+- **`skills/`** — Codex's portable wrapper index into the canonical skill directories. Each wrapper preserves the canonical frontmatter and forwards to the full workflow; keep both in parity with `.claude-plugin/plugin.json`.
 - **`install/README.md`** — convention for adding per-host install adapters (Codex, Hermes, etc.) without duplicating skills.
 
 ## Working style: brutal honesty, relentless quality
@@ -36,8 +37,8 @@ This code ships to real users. Sycophancy and rubber-stamping cost us credibilit
 
 - Home of the `notfair` plugin — the public artifact customers install.
 - Contains host-agnostic skills under `paid-ads/`, `google-ads/`, `meta-ads/`, `analytics/`, `seo/`, `gemini/`, and `notfair-upgrade-skill/`.
-- Registered via `.claude-plugin/plugin.json` + `.claude-plugin/marketplace.json` (Claude Code) and `AGENTS.md` (every other host).
-- Paired with NotFair MCP servers for Google, Meta, X, and LinkedIn Ads plus Google Search Console and Google Analytics (OAuth at notfair.co).
+- Registered via `.claude-plugin/plugin.json` + `.claude-plugin/marketplace.json` (Claude Code), `.codex-plugin/plugin.json` (Codex), and `AGENTS.md` (every host's resolver).
+- Paired with one universal NotFair MCP server for Google, Meta, X, and LinkedIn Ads plus Google Search Console and Google Analytics (OAuth at notfair.co).
 
 ## Critical: this ships to users
 
@@ -47,19 +48,21 @@ This code ships to real users. Sycophancy and rubber-stamping cost us credibilit
 
 ## Branding: NotFair
 
-The product is **NotFair**. All user-facing text, documentation, skill descriptions, and config namespaces use NotFair / `notfair.co` / `.notfair/` / `mcp__notfair__*`. The prior brand has been fully removed from this repo — do not reintroduce any of its strings (names, config paths, MCP prefixes, URI schemes, or domains) in new code, new docs, or rewrites of existing files. The only allowed "legacy" references in active code are the `mcp__notfair__*` prefix and `.notfair.json` config (these reflect the more recent NotFair → NotFair-GoogleAds namespace split, not the older rebrand).
+The product is **NotFair**. All user-facing text, documentation, skill descriptions, and config namespaces use NotFair / `notfair.co` / `.notfair/` / `mcp__NotFair__*`. The prior brand has been fully removed from this repo — do not reintroduce any of its strings (names, config paths, MCP prefixes, URI schemes, or domains) in new code, new docs, or rewrites of existing files. Dedicated platform-prefixed NotFair namespaces may remain in compatibility guidance, but the installed plugin's current default is the universal `NotFair` server.
 
 ## When adding or modifying a skill
 
 1. Create/edit the skill directory under the appropriate category (`google-ads/`, `seo/`, etc.) with a `SKILL.md` containing valid frontmatter.
 2. **Register it in `AGENTS.md`** under the matching intent table. A skill that isn't in `AGENTS.md` is invisible to Codex, Hermes, and any non-Claude host.
 3. **Register it in `.claude-plugin/plugin.json`** under the `skills` array. A skill that exists on disk but isn't listed here will NOT appear in the installed Claude Code plugin — this has already bitten us once with `ads-landing`.
-4. Bump the version in three places so upgrades propagate:
+4. **Link it under `skills/`** using the skill's frontmatter name so Codex discovers the same canonical source without duplication.
+5. Bump the version in all manifests so upgrades propagate:
    - `.claude-plugin/plugin.json` → `version`
+   - `.codex-plugin/plugin.json` → `version`
    - `.claude-plugin/marketplace.json` → both `metadata.version` and `plugins[0].version`
    - `VERSION` file at repo root
-5. Update `CHANGELOG.md` with a user-facing note.
-6. Verify locally, then ship via `/ship`. Users pick up the new version through `notfair:upgrade`.
+6. Update `CHANGELOG.md` with a user-facing note.
+7. Verify locally, then ship via `/ship`. Users pick up the new version through `notfair:upgrade`.
 
 ## Versioning
 

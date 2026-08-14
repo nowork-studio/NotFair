@@ -5,14 +5,14 @@
   },
   "metadata": {
     "description": "The official ads, analytics, SEO, and GEO plugin from NotFair.",
-    "version": "0.26.0"
+    "version": "0.27.0"
   },
   "plugins": [
     {
       "name": "notfair",
       "source": "./",
       "description": "Operate Google, Meta, X, and LinkedIn Ads; analyze Search Console and GA4; and run open-source SEO, GEO, and content workflows.",
-      "version": "0.26.0",
+      "version": "0.27.0",
       "author": {
         "name": "NotFair",
         "url": "https://notfair.co"

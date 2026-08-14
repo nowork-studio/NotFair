@@ -224,8 +224,8 @@ first surface that's actually available in the current host, in this order:
 
 1. **Codex or other host with native image generation** (gpt-image, Imagen, etc.)
    — generate the image inline. Save to `images/` or the path the user specifies.
-2. **NotFair MCP `generate_image`** — if a NotFair MCP server is connected
-   (`mcp__NotFair-GoogleAds__generate_image` or `mcp__NotFair-MetaAds__generate_image`),
+2. **NotFair MCP `generate_image`** — if the universal NotFair MCP is connected
+   (`mcp__NotFair__google_ads_generate_image` or `mcp__NotFair__meta_ads_generate_image`, subject to host sanitization),
    it generates marketing-grade visuals from a prompt. Works for blog imagery too.
 3. **No image-gen surface available** — output the detailed prompt for each image
    so the user can run it in their own tool (Midjourney, DALL·E, Figma AI, etc.),

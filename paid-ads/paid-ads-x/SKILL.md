@@ -6,11 +6,11 @@ argument-hint: "<account, campaign, date range, or X Ads goal>"
 
 # X Ads
 
-Read `../shared/operating-contract.md` and `../shared/measurement-framework.md` before acting. Use the live NotFair X Ads MCP as the source of truth; its dedicated endpoint is `https://notfair.co/api/mcp/x_ads`.
+Read `../shared/operating-contract.md` and `../shared/measurement-framework.md` before acting. Use the `x_ads_` tools on the universal NotFair MCP as the source of truth.
 
 ## Establish the live scope
 
-1. Discover the X Ads connector and its current tool surface. Resolve the tool-agnostic placeholder `~~x-ads` to that connector; do not infer access from a Google, Meta, or universal NotFair tool.
+1. Resolve `~~x-ads` to the universal connector's `x_ads_` tool surface or a verified compatible connector. On the universal connector, call `listConnectedPlatforms` and require X Ads to be connected; do not infer X access from another platform's tools.
 2. Confirm the selected account with a harmless account/setup read. If the connector is missing or unauthorized, direct the user to connect or re-authorize X Ads and stop before claiming live access.
 3. Record the account currency, timezone, objective, conversion definition, attribution basis, and requested date window. Treat tracking gaps as limitations, not zero performance.
 

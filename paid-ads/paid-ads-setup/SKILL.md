@@ -10,7 +10,7 @@ Read `../shared/operating-contract.md`. Do not alter campaigns during setup.
 
 ## Establish access
 
-1. Detect the requested NotFair platform surface. Use the existing shared preambles for Google Ads and Meta Ads; use `https://notfair.co/api/mcp/x_ads` for X Ads and `https://notfair.co/api/mcp/linkedin_ads` for LinkedIn Ads. If the requested connector is missing, give its connection path and stop before claiming access.
+1. Detect the requested platform on the universal NotFair MCP. Call `listConnectedPlatforms`, then use the existing shared preambles for Google Ads and Meta Ads or the `x_ads_` and `linkedin_ads_` tool surfaces. If the requested platform is missing, direct the user to connect it in NotFair and stop before claiming access.
 2. List only accounts actually returned by the connected surface. Let the user select the intended account when more than one is available; never infer it from an account name.
 3. For TikTok, Amazon, and ChatGPT Ads, check the available tools before proposing a connection. If no verified connector exists, request a current export or describe the plan-only boundary.
 

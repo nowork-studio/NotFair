@@ -56,12 +56,14 @@ Continue to Step 2 (MCP detection always runs).
 
 Always verify that a Meta Ads MCP server is available — the MCP server could be down, unauthorized, or misconfigured even with a saved `metaAccountId`.
 
-1. Check for the NotFair Meta tools. The MCP server may be exposed under several different tool-name prefixes depending on the host:
-   - `mcp__NotFair-MetaAds__*` / `mcp__notfair_metaads__*` / `mcp__NotFair_MetaAds__*` — Claude Code CLI (NotFair plugin default; exact form depends on Claude Code's key sanitization)
-   - `mcp__claude_ai_NotFair-MetaAds__*` / `mcp__claude_ai_NotFairMetaAds__*` — Claude Desktop / claude.ai plugin connector
-   - any other prefix matching `mcp__.*([Nn]ot[Ff]air[-_]?[Mm]eta[Aa]ds?)__` (future hosts)
+1. Check for the NotFair Meta tools. The current plugin registers one universal server whose Meta tools are platform-prefixed:
+   - `mcp__NotFair__meta_ads_*` (or a host-sanitized equivalent) — current universal plugin default
+   - `mcp__NotFair-MetaAds__*` / `mcp__notfair_metaads__*` / `mcp__NotFair_MetaAds__*` — supported dedicated-server compatibility
+   - `mcp__claude_ai_NotFair-MetaAds__*` / `mcp__claude_ai_NotFairMetaAds__*` — supported hosted-connector compatibility
 
-   **How to detect:** scan your available tool list for any tool whose name ends in `listAdAccounts` AND whose prefix references Meta (matches the regex above — do not pick a generic `listAdAccounts` from another platform's MCP). Take everything before `listAdAccounts` as the detected prefix. Save the prefix and the result for reuse in Steps 3 and 4.
+   **How to detect:** first look for a tool whose name ends in `meta_ads_listAdAccounts`; take everything before `listAdAccounts` as the detected prefix. If none exists, look for a dedicated NotFair Meta form ending in `listAdAccounts`.
+
+   On the universal server, call `listConnectedPlatforms` **before** any platform-prefixed account tool. If `meta_ads` is not connected, tell the user to connect Meta Ads in the selected NotFair workspace and stop; do not call `meta_ads_listAdAccounts`. Once connected, call the detected `listAdAccounts` once and save both the result and exact prefix for Steps 3 and 4. On a dedicated or hosted connector, call `listAdAccounts` directly.
 
 2. If no NotFair-MetaAds variant exists, check for Meta's official MCP or community Meta MCP servers (any `mcp__.*meta.*ads__listAdAccounts`). If you find one, fall back to it but warn the user that NotFair's heuristics are tuned for the NotFair MCP surface (specifically `runScript`'s `ads.graphParallel`).
 
@@ -69,7 +71,7 @@ Always verify that a Meta Ads MCP server is available — the MCP server could b
 
 > No Meta Ads MCP server detected.
 >
-> The NotFair plugin registers the `NotFair-MetaAds` HTTP MCP server (`https://notfair.co/api/mcp/meta_ads`) in `.mcp.json`. Try restarting Claude Code — on first connection it opens a browser tab for OAuth sign-in to NotFair. You can also trigger sign-in manually with `/mcp`.
+> The NotFair plugin registers one universal `NotFair` HTTP MCP server (`https://notfair.co/api/mcp/notfair_ads`) in `.mcp.json`. Trigger sign-in with the host's MCP UI (`/mcp` in Claude) or `codex mcp login NotFair` in Codex CLI; the host opens the browser OAuth flow.
 >
 > If the problem persists, run `/notfair:upgrade` to make sure your NotFair plugin includes the Meta server registration, or configure a Meta Ads MCP server manually.
 
@@ -100,8 +102,8 @@ If the user explicitly asks to switch accounts, run `listAdAccounts`, let them p
 
 Use whichever MCP server prefix was detected in Step 2:
 
-- **NotFair-MetaAds via Claude Code CLI:** `mcp__NotFair-MetaAds__<toolName>` (or whatever sanitized form the host emits)
-- **NotFair-MetaAds via Claude Desktop / claude.ai plugin:** `mcp__claude_ai_NotFair-MetaAds__<toolName>` / `mcp__claude_ai_NotFairMetaAds__<toolName>`
+- **Universal NotFair MCP (current plugin default):** `mcp__NotFair__meta_ads_<toolName>` or the exact host-sanitized equivalent
+- **Dedicated NotFair Meta compatibility:** `mcp__NotFair-MetaAds__<toolName>` / `mcp__claude_ai_NotFairMetaAds__<toolName>`
 
 Always call tools under the exact prefix detected in Step 2 — do not hardcode any prefix. The MCP server's `ads.activeAccountId` is the `act_<metaAccountId>` form derived from the saved `metaAccountId` (Step 1). For most tools you do not need to pass the account id explicitly (the server resolves it from the OAuth session); when a tool does take an `adAccountId` argument, pass `act_<metaAccountId>`.
 

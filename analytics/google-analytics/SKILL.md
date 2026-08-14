@@ -6,13 +6,13 @@ argument-hint: "<property, date range, metric, or GA4 question>"
 
 # Google Analytics
 
-Read `../shared/operating-contract.md`. Use the live NotFair Google Analytics MCP at `https://notfair.co/api/mcp/google_analytics` as the source of truth.
+Read `../shared/operating-contract.md`. Use the `google_analytics_` tools on the universal NotFair MCP as the source of truth.
 
 ## Select the property and question
 
 1. Resolve `~~google-analytics` to the actual GA4 connector and inspect its current tools. Confirm access with `listProperties` or the equivalent harmless property-list read.
 2. Select the exact `properties/123456789` resource returned by the connector. Never substitute a `G-` measurement ID or Google account ID.
-3. Define the business question, primary metric, conversion or key-event definition, property timezone, date range, and comparison window. If the connector is missing or unauthorized, provide the endpoint/setup path and stop before claiming live data.
+3. Define the business question, primary metric, conversion or key-event definition, property timezone, date range, and comparison window. If the platform is missing or unauthorized, direct the user to reconnect the universal NotFair plugin and stop before claiming live data.
 
 ## Pull decision-grade evidence
 

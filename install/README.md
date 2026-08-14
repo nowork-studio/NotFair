@@ -7,7 +7,7 @@ This directory is the home for **thin install adapters** that wire NotFair into 
 NotFair ships one source of truth for skills. Different agent hosts expect skills in different places:
 
 - **Claude Code** — reads `.claude-plugin/plugin.json` directly from the repo. No adapter needed; the manifest at the repo root *is* the adapter.
-- **Codex** — reads `AGENTS.md` at the workspace root. No filesystem install yet; workspace-local usage is the supported path. A future `install/codex/` adapter can register skills into Codex's global skill directory.
+- **Codex** — installs the repository directly as `notfair@nowork-studio`. `.codex-plugin/plugin.json` loads the universal MCP configuration and a portable `skills/` wrapper index that forwards to the same host-agnostic skill sources; no separate copied adapter is needed.
 - **Hermes** — reads `AGENTS.md` at the workspace root. Same shape as Codex.
 
 ## Adding a new host adapter

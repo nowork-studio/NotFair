@@ -98,12 +98,8 @@ Skills under `seo/`, `paid-ads/`, `google-ads/`, `meta-ads/`, `analytics/`, `gem
 
 ## External dependencies
 
-- **Google Search Console (NotFair MCP)** — `https://notfair.co/api/mcp/google_search_console`, OAuth. Required for live Search Console analysis; existing local GSC workflows may also use Google OAuth directly.
-- **Google Analytics (NotFair MCP)** — `https://notfair.co/api/mcp/google_analytics`, OAuth. Required for live GA4 analysis and supported measurement configuration.
-- **Google Ads (NotFair MCP)** — `https://notfair.co/api/mcp/google_ads`, OAuth. Required for Google Ads skills.
-- **Meta Marketing API (NotFair MCP)** — required for Meta Ads skills.
-- **X Ads (NotFair MCP)** — `https://notfair.co/api/mcp/x_ads`, OAuth. Required for live X Ads work.
-- **LinkedIn Ads (NotFair MCP)** — `https://notfair.co/api/mcp/linkedin_ads`, OAuth. Required for live LinkedIn Ads work.
+- **Universal NotFair MCP** — `https://notfair.co/api/mcp/notfair_ads`, OAuth. The plugin registers this single connection for Google Ads, Meta Ads, X Ads, LinkedIn Ads, Google Search Console, and Google Analytics. Its tools carry platform prefixes such as `google_ads_`, `meta_ads_`, and `search_console_`; verify the requested platform is connected before claiming live access.
+- **Platform connections** — each live skill still requires its corresponding account or property to be connected inside the selected NotFair workspace. A universal MCP session does not imply that every platform is connected.
 - **Google Gemini API key** — required for `gemini`.
 
 TikTok, Amazon, and ChatGPT Ads skills are planning/review workflows unless the current session exposes a verified connector. They do not imply account or mutation access.

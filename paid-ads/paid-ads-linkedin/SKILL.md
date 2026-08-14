@@ -6,11 +6,11 @@ argument-hint: "<B2B goal, audience, account, or date range>"
 
 # LinkedIn Ads
 
-Read `../shared/operating-contract.md` and `../shared/measurement-framework.md` before acting. Prefer the live NotFair LinkedIn Ads MCP at `https://notfair.co/api/mcp/linkedin_ads`; use a supplied export only when no verified connector is available.
+Read `../shared/operating-contract.md` and `../shared/measurement-framework.md` before acting. Prefer the `linkedin_ads_` tools on the universal NotFair MCP; use a supplied export only when no verified connector is available.
 
 ## Establish access and qualified-demand context
 
-1. Resolve `~~linkedin-ads` to the actual LinkedIn connector and inspect its current tools. Confirm the selected account with a harmless account/setup read. Do not infer access from another NotFair connector.
+1. Resolve `~~linkedin-ads` to the universal connector's `linkedin_ads_` tool surface or a verified compatible connector. Call `listConnectedPlatforms` when using NotFair, then confirm the selected account with a harmless account/setup read. Do not infer LinkedIn access from another platform's tools.
 2. If the connector is missing or unauthorized, request re-authorization or a current export and keep the result plan/review-only.
 3. Define the sales-qualified conversion, CRM feedback loop, account currency, attribution basis, target CPA or pipeline outcome, and complete date window before diagnosing performance.
 

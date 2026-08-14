@@ -220,9 +220,22 @@ assert_file "$REPO_ROOT/bin/notfair-change-watch" "bin/notfair-change-watch exis
   && pass "legacy toprank-upgrade-skill/ removed" \
   || fail "toprank-upgrade-skill/ still exists (should have been git-mv'd to notfair-upgrade-skill/)"
 
-[ ! -d "$REPO_ROOT/skills" ] \
-  && pass "skills/ flat directory removed" \
-  || fail "skills/ directory still exists (skills should be in google-ads/, seo/, meta-ads/, notfair-upgrade-skill/, gemini/)"
+CODEX_SKILL_DIR_COUNT=$(find "$REPO_ROOT/skills" -mindepth 1 -maxdepth 1 -type d | wc -l | tr -d '[:space:]')
+[ "$CODEX_SKILL_DIR_COUNT" -eq "${#SKILL_ENTRIES[@]}" ] \
+  && pass "skills/ exposes all ${#SKILL_ENTRIES[@]} canonical skills to Codex as portable wrappers" \
+  || fail "skills/ has $CODEX_SKILL_DIR_COUNT directories, expected ${#SKILL_ENTRIES[@]}"
+
+[ -z "$(find "$REPO_ROOT/skills" -mindepth 1 -maxdepth 1 -type l -print -quit)" ] \
+  && pass "skills/ contains no symlinks that Codex packaging could drop" \
+  || fail "skills/ contains symlinks that Codex packaging could drop"
+
+for entry in "${SKILL_ENTRIES[@]}"; do
+  skill=$(skill_name "$entry")
+  path=$(skill_path "$entry")
+  wrapper="$REPO_ROOT/skills/$skill/SKILL.md"
+  assert_file "$wrapper" "Codex skill wrapper: $skill"
+  assert_contains "$wrapper" "../../$path/SKILL.md" "Codex skill wrapper forwards $skill to $path"
+done
 
 [ ! -d "$REPO_ROOT/.agents" ] \
   && pass ".agents/ directory removed" \
@@ -260,17 +273,18 @@ done
 echo ""
 echo "=== 5. MCP server config ==="
 
-assert_contains "$REPO_ROOT/.mcp.json" "\"NotFair-GoogleAds\"" ".mcp.json registers the NotFair-GoogleAds server"
+assert_file "$REPO_ROOT/.codex-plugin/plugin.json" "Codex plugin manifest exists"
+assert_contains "$REPO_ROOT/.codex-plugin/plugin.json" '"mcpServers": "./.mcp.json"' "Codex manifest loads the MCP config"
+assert_contains "$REPO_ROOT/.codex-plugin/plugin.json" '"skills": "./skills/"' "Codex manifest loads the canonical skill index"
+assert_contains "$REPO_ROOT/.mcp.json" "\"NotFair\"" ".mcp.json registers the universal NotFair server"
 assert_contains "$REPO_ROOT/.mcp.json" "\"type\": \"http\"" ".mcp.json uses native HTTP transport (no mcp-remote bridge)"
-assert_contains "$REPO_ROOT/.mcp.json" "notfair.co/api/mcp/google_ads" ".mcp.json points at NotFair-GoogleAds MCP endpoint"
-assert_contains "$REPO_ROOT/.mcp.json" "\"NotFair-XAds\"" ".mcp.json registers the NotFair-XAds server"
-assert_contains "$REPO_ROOT/.mcp.json" "notfair.co/api/mcp/x_ads" ".mcp.json points at the X Ads MCP endpoint"
-assert_contains "$REPO_ROOT/.mcp.json" "\"NotFair-LinkedInAds\"" ".mcp.json registers the NotFair-LinkedInAds server"
-assert_contains "$REPO_ROOT/.mcp.json" "notfair.co/api/mcp/linkedin_ads" ".mcp.json points at the LinkedIn Ads MCP endpoint"
-assert_contains "$REPO_ROOT/.mcp.json" "\"NotFair-GoogleSearchConsole\"" ".mcp.json registers the canonical Search Console server"
-assert_contains "$REPO_ROOT/.mcp.json" "notfair.co/api/mcp/google_search_console" ".mcp.json points at the Search Console MCP endpoint"
-assert_contains "$REPO_ROOT/.mcp.json" "\"NotFair-GoogleAnalytics\"" ".mcp.json registers the NotFair-GoogleAnalytics server"
-assert_contains "$REPO_ROOT/.mcp.json" "notfair.co/api/mcp/google_analytics" ".mcp.json points at the Google Analytics MCP endpoint"
+assert_contains "$REPO_ROOT/.mcp.json" "https://notfair.co/api/mcp/notfair_ads" ".mcp.json points at the canonical universal NotFair MCP endpoint"
+assert_not_contains "$REPO_ROOT/.mcp.json" "https://www.notfair.co" ".mcp.json origin matches the OAuth issuer exactly"
+assert_not_contains "$REPO_ROOT/.mcp.json" "api/mcp/google_ads" ".mcp.json does not auto-register the dedicated Google Ads endpoint"
+assert_not_contains "$REPO_ROOT/.mcp.json" "api/mcp/meta_ads" ".mcp.json does not auto-register the dedicated Meta Ads endpoint"
+assert_contains "$REPO_ROOT/README.md" "codex mcp login NotFair" "README Codex install starts the OAuth flow"
+assert_contains "$REPO_ROOT/INSTALL_FOR_AGENTS.md" "codex mcp login NotFair" "agent installer starts the Codex OAuth flow"
+assert_contains "$REPO_ROOT/INSTALL_FOR_AGENTS.md" "codex plugin marketplace upgrade nowork-studio" "agent installer handles an existing marketplace"
 
 # ─── Test 6: Connectors section in README ─────────────────────
 
