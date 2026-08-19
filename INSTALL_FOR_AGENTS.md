@@ -90,6 +90,7 @@ NotFair skills depend on external APIs. Walk the user through whichever they nee
 - **Google Ads** — connected in the same first-run flow for workspaces enabled in the staged Google-first rollout; otherwise connect it in NotFair.
 - **Google Search Console, Google Analytics, Meta Ads, X Ads, and LinkedIn Ads** — available through the same MCP after each platform is connected in the selected NotFair workspace.
 - **Google Gemini** — required only for the `gemini` skill. Needs a Gemini API key in environment.
+- **OrcaRouter** — required only for the `orcarouter` skill. Needs an OrcaRouter API key in environment (set `ORCAROUTER_API_KEY`; keys start with `sk-orca-`). Get one at https://www.orcarouter.ai/console.
 
 Do **not** invent credentials. If a skill needs auth that isn't present, surface the gap and walk the user through the connection flow.
 

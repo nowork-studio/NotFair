@@ -11,6 +11,8 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ### Added
 
+- **OrcaRouter cross-model review skill (v0.28.0).** Added an `orcarouter` skill that routes a second opinion through OrcaRouter — one OpenAI-compatible endpoint and API key, no CLI install, with the `orcarouter/auto` smart router picking the best upstream model per request. Mirrors the existing `gemini` skill with review, challenge, and consult modes for code, Google Ads, and SEO changes, and honors an optional `ORCAROUTER_MODEL` override to pin a specific model.
+
 - **X Ads, LinkedIn Ads, GA4, and Search Console MCP skills (v0.26.0).** Added a live X Ads operator plus dedicated Google Analytics and Search Console workflows, and upgraded the existing LinkedIn skill from export-first planning to live read/write operation. Registered the four sibling-server endpoints in `.mcp.json`, expanded cross-channel routing and approval guardrails, added reproducible live OAuth-discovery end-to-end coverage, and refreshed the public skill/integration catalog.
 
 - **Cross-channel paid-ads skills (v0.25.11).** Added an evidence-first paid-media router plus guide, setup, integration, launch, review, optimization, creative, LinkedIn, TikTok, Amazon, and ChatGPT Ads workflows. Google and Meta requests route to the established NotFair operator skills; platforms without a declared NotFair MCP surface remain explicitly plan/review-only until a verified connector is available. Every workflow carries shared approval, measurement, and publication-status guardrails.
