@@ -12,7 +12,7 @@ If you are an agent and a user mentions Google Ads, Meta Ads, SEO, GEO, or anyth
 2. **Read the named skill's `SKILL.md`** from the path shown.
 3. **Follow the procedure** in that SKILL.md exactly.
 
-Skills under `seo/`, `paid-ads/`, `google-ads/`, `meta-ads/`, `analytics/`, `gemini/`, and `notfair-upgrade-skill/` are **host-agnostic** — they work the same on every supported agent host.
+Skills under `seo/`, `paid-ads/`, `google-ads/`, `meta-ads/`, `analytics/`, `gemini/`, `orcarouter/`, and `notfair-upgrade-skill/` are **host-agnostic** — they work the same on every supported agent host.
 
 ---
 
@@ -89,6 +89,7 @@ Skills under `seo/`, `paid-ads/`, `google-ads/`, `meta-ads/`, `analytics/`, `gem
 | Intent | Skill | Path |
 |---|---|---|
 | Second opinion / review / challenge / consult via Google Gemini | `gemini` | `gemini/SKILL.md` |
+| Second opinion / review / challenge / consult via OrcaRouter (routed model, no CLI needed) | `orcarouter` | `orcarouter/SKILL.md` |
 
 ## Plugin maintenance
 
@@ -101,6 +102,7 @@ Skills under `seo/`, `paid-ads/`, `google-ads/`, `meta-ads/`, `analytics/`, `gem
 - **Universal NotFair MCP** — `https://notfair.co/api/mcp/notfair_ads`, OAuth. The plugin registers this single connection for Google Ads, Meta Ads, X Ads, LinkedIn Ads, Google Search Console, and Google Analytics. Its tools carry platform prefixes such as `google_ads_`, `meta_ads_`, and `search_console_`; verify the requested platform is connected before claiming live access.
 - **Platform connections** — each live skill still requires its corresponding account or property to be connected inside the selected NotFair workspace. A universal MCP session does not imply that every platform is connected.
 - **Google Gemini API key** — required for `gemini`.
+- **OrcaRouter API key** — required for `orcarouter`. Set `ORCAROUTER_API_KEY`; keys start with `sk-orca-` and are issued at https://www.orcarouter.ai/console.
 
 TikTok, Amazon, and ChatGPT Ads skills are planning/review workflows unless the current session exposes a verified connector. They do not imply account or mutation access.
 

@@ -23,7 +23,7 @@ Every skill is built in the open as a readable `SKILL.md`, with supporting refer
 | **Analytics** | Query live GA4 and Search Console data, compare complete periods, inspect URLs, manage sitemaps, and update supported measurement configuration |
 | **Content** | Turn search demand into editorial plans, briefs, articles, landing pages, metadata, and structured data |
 
-The NotFair Plugin currently ships **45 skills** across SEO, GEO, paid media, advertising platforms, analytics, and cross-model review.
+The NotFair Plugin currently ships **46 skills** across SEO, GEO, paid media, advertising platforms, analytics, and cross-model review.
 
 ## Quick start
 
@@ -169,6 +169,7 @@ Marketing work gets unreliable when every request goes through the same vague pr
 | Skill | What it does |
 |---|---|
 | [`gemini`](gemini/) | Uses Google Gemini for a second opinion, adversarial challenge, or open consultation. |
+| [`orcarouter`](orcarouter/) | Routes a second opinion through OrcaRouter — one API key, no CLI, picking the best model for the job. |
 | [`upgrade`](notfair-upgrade-skill/) | Updates an installed NotFair plugin and summarizes what changed. |
 
 ## Live data and integrations
@@ -185,6 +186,7 @@ Some skills work entirely from a repository, URL, or supplied export. Live accou
 | **LinkedIn Ads** | Campaign groups, campaigns, creatives, analytics, targeting, conversions, and leads | Universal NotFair MCP via `linkedin_ads_` tools |
 | **CMS platforms** | Content and SEO-field review in WordPress, Strapi, Contentful, or Ghost | Platform API or compatible MCP |
 | **Google Gemini** | Cross-model review | Gemini API key |
+| **OrcaRouter** | Cross-model review (routed models, no CLI) | OrcaRouter API key |
 
 Google Ads, Meta Ads, X Ads, and LinkedIn Ads use explicit, bounded mutation tools. Search Console and GA4 also expose narrow configuration writes with approval and read-back rules. TikTok, Amazon, and ChatGPT Ads remain planning or export-review workflows unless the current agent session exposes a verified connector.
 
@@ -202,6 +204,7 @@ notfair-plugin/
 ├── analytics/                   # Google Analytics and Search Console MCP workflows
 ├── seo/                         # SEO, GEO, content, and technical-search skills
 ├── gemini/                      # cross-model review
+├── orcarouter/                  # cross-model review via routed models
 ├── test/                        # unit and LLM-judge evals
 └── notfair/                     # optional local goal-loop application
 ```
