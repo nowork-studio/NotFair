@@ -18,7 +18,7 @@ import subprocess
 import sys
 import urllib.request
 
-from _gcloud import gcloud_run
+from _gcloud import adc_access_token, gcloud_run
 
 
 def check_python_version():
@@ -198,10 +198,7 @@ def check_adc_credentials():
     the correct scopes.
     """
     try:
-        result = gcloud_run(
-            ["gcloud", "auth", "application-default", "print-access-token"],
-            capture_output=True, text=True, timeout=15,
-        )
+        result = adc_access_token()
     except subprocess.TimeoutExpired:
         print("ERROR: gcloud timed out checking credentials. Check your network.", file=sys.stderr)
         sys.exit(1)
